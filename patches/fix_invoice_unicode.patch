@@ -1,0 +1,15 @@
+--- a/src/invoice.py
++++ b/src/invoice.py
+@@ -2,7 +2,11 @@
+ 
+ import re
+ 
+-_PATTERN = re.compile(r"^FV/(\d{4})/(0[1-9]|1[0-2])/(\d{4})$")
++# re.ASCII: bez tej flagi \d dopasowuje takze cyfry spoza ASCII (np.
++# arabsko-indyjskie), a int() je konwertuje - wiec "FV/\u0662\u0660\u0662\u0666/09/0042"
++# przechodzilo walidacje. SPEC.md sekcja 2 mowi o zapisie cyframi
++# dziesietnymi.
++_PATTERN = re.compile(r"^FV/(\d{4})/(0[1-9]|1[0-2])/(\d{4})$", re.ASCII)
+ 
+ 
+ def parse_invoice_id(raw: str) -> dict:

@@ -1,0 +1,13 @@
+[project]
+name = "sbst-llm-minimal"
+version = "1.0.0"
+description = "Minimalny przyklad: SBST (Pynguin) vs LLM vs hybryda, na kodzie Python bez etapu budowania"
+requires-python = ">=3.10,<3.15"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pynguin==0.46.0",
+  "pytest==8.4.2",
+  "pytest-cov==7.0.0",
+]

@@ -1,0 +1,8 @@
+{
+  "model": "claude-opus-5",
+  "effort": "high",
+  "turns": 11,
+  "costUSD": 0.9001275000000001,
+  "outputTokens": 15183,
+  "toolCalls": 10
+}

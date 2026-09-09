@@ -1,0 +1,16 @@
+--- a/src/loyalty.py
++++ b/src/loyalty.py
+@@ -8,9 +8,11 @@
+     if order_value_pln < 0 or lifetime_spend_pln < 0:
+         raise ValueError("amounts must not be negative")
+ 
+-    points = int(order_value_pln // 10)
++    # round() w Pythonie to zaokraglenie bankierskie - dokladnie to, czego
++    # wymaga SPEC.md sekcja 1.
++    points = round(order_value_pln / 10)
+ 
+-    if lifetime_spend_pln > VIP_THRESHOLD_PLN:
++    if lifetime_spend_pln >= VIP_THRESHOLD_PLN:
+         points = points * 2
+ 
+     if points > POINTS_CAP:
