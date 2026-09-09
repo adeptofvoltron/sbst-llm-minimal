@@ -5,24 +5,24 @@ import invoice as module_0
 
 
 def test_case_0():
-    str_0 = "L$xDz3$1Ns"
+    str_0 = 'W"Oht'
     with pytest.raises(ValueError):
         module_0.parse_invoice_id(str_0)
 
 
 def test_case_1():
-    str_0 = "i>.5"
+    str_0 = "Z&Ou"
     with pytest.raises(ValueError):
         module_0.parse_invoice_id(str_0)
 
 
 def test_case_2():
-    str_0 = "L$xDz3$1Ns"
+    str_0 = 'W"Oht'
     with pytest.raises(ValueError):
         module_0.parse_invoice_id(str_0)
 
 
 def test_case_3():
-    str_0 = "uf"
+    str_0 = "r68"
     with pytest.raises(ValueError):
         module_0.parse_invoice_id(str_0)

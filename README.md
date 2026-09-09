@@ -46,6 +46,14 @@ Szczegoly kazdej z nich: [`docs/USTALENIA.md`](docs/USTALENIA.md).
 
 ---
 
+## Chcesz to pokazac?
+
+[`KROK-PO-KROKU.md`](KROK-PO-KROKU.md) - osiem komend, najdluzsza 3 sekundy,
+zero wywolan API. Kazda komenda i kazdy oczekiwany wynik zostaly wykonane
+dokladnie tak, jak sa zapisane.
+
+---
+
 ## Setup
 
 ```bash
@@ -238,6 +246,7 @@ bash run-llm.sh prompts/llm-ze-spec.md
 | `make sbst MODUL=loyalty` | przeszukiwanie | 3 s |
 | `make ziarna MODUL=invoice` | przeszukiwanie z ziarnami | 3 s |
 | `make pokrycie MODUL=invoice` | faktyczne pokrycie wygenerowanych plikow | 1 s |
+| `make raport MODUL=invoice` | raport Pynguina **obok** faktycznego pokrycia | 2 s |
 | `make fwpw` | walidacja Fails Without / Passes With | 1 s |
 | `make czysto` | porzadki | - |
 

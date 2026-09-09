@@ -5,6 +5,6 @@ import invoice as module_0
 
 
 def test_case_0():
-    str_0 = "!0s"
+    str_0 = "s"
     with pytest.raises(ValueError):
         module_0.parse_invoice_id(str_0)

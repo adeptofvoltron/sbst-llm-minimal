@@ -4,6 +4,7 @@
 #   make sbst      - wygeneruj testy przeszukiwaniem (Pynguin)
 #   make ziarna    - to samo, ale z ziarnami semantycznymi od LLM-a
 #   make pokrycie  - zmierz, co FAKTYCZNIE pokrywaja wygenerowane pliki
+#   make raport    - pokaz, co RAPORTUJE Pynguin (to nie to samo)
 #   make fwpw      - walidacja Fails Without / Passes With
 #   make czysto    - posprzataj
 #
@@ -16,7 +17,7 @@ ZIARNO ?= 42
 MODUL  ?= invoice
 KATALOG ?= tests_sbst
 
-.PHONY: setup sbst ziarna pokrycie fwpw czysto
+.PHONY: setup sbst ziarna pokrycie raport fwpw czysto
 
 setup:
 	uv venv --python 3.12
@@ -46,6 +47,18 @@ pokrycie:
 	      | grep -E "$(MODUL).py|passed|failed" || true; \
 	  fi; \
 	done
+
+# Pokrycie zgloszone przez Pynguina w trakcie przeszukiwania. NIE jest
+# tozsame z pokryciem wygenerowanego pliku - patrz docs/USTALENIA.md, punkt 1.
+raport:
+	@printf "\npokrycie RAPORTOWANE przez Pynguina (w trakcie przeszukiwania):\n"
+	@for w in sbst ziarna; do \
+	  if [ -f raport/$$w/statistics.csv ]; then \
+	    printf "  %-8s %s\n" "$$w" "$$(tail -1 raport/$$w/statistics.csv)"; \
+	  fi; \
+	done
+	@printf "\npokrycie FAKTYCZNE wygenerowanych plikow (pytest-cov):\n"
+	@$(MAKE) --no-print-directory pokrycie MODUL=$(MODUL) 2>/dev/null | grep -E "===|$(MODUL).py" | sed 's/^/  /'
 
 # Walidacja tautologiczna: suite, ktory poprawnie wykrywa defekt, NIE
 # przechodzi na obecnym kodzie i przechodzi po nalozeniu patcha.
