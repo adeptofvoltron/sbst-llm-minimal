@@ -225,25 +225,37 @@ this repository. See [`docs/FINDINGS.md`](docs/FINDINGS.md), point 1.
 ## Step 5: the LLM with the specification
 
 The tests are committed, so this step needs no API key. The prompt is in
-[`prompts/llm-from-spec.md`](prompts/llm-from-spec.md) together with the model
-and effort level used, and the transcript with every tool call is in
-`artifacts/`.
+[`prompts/llm-from-spec.md`](prompts/llm-from-spec.md), and the full request
+and reply are recorded in `artifacts/`.
 
 ```bash
 make coverage MODULE=loyalty
 make fwpw TESTS=tests_llm
 ```
 
-To regenerate from scratch (requires Claude Code):
+To regenerate from scratch (needs a key):
 
 ```bash
+# key from .env
 bash run-llm.sh prompts/llm-from-spec.md
+
+# or without the key ever touching disk
+op run --env-file=.env.op -- bash run-llm.sh prompts/llm-from-spec.md
 ```
 
-> The committed `tests_llm/` and `artifacts/` come from a run of the original
-> Polish prompt, which is why the generated test names are in Polish. They are
-> kept byte for byte as the model produced them; regenerating with the prompt
-> above replaces both.
+`run-llm.sh` uses the same configuration as `make hybrid` - `LLM_MODEL`,
+`LLM_BASE_URL` and the key from `.env` - so the LLM-only row and the hybrid row
+of the table run on the same model, and the comparison is about the method
+rather than about the model. A plain chat completion has no tools, so the
+script sends `SPEC.md` and both source files with the request and writes the
+two files out of the reply; the model never sees the rest of the repository.
+
+> The committed `tests_llm/` predates this: it comes from a run of the original
+> Polish prompt through Claude Code, which is why the generated test names are
+> in Polish. Those files and their transcript
+> (`artifacts/llm-from-spec.claude-code.jsonl`) are kept byte for byte as the
+> model produced them. Regenerating with the command above replaces the tests
+> and writes its own record next to it.
 
 ---
 

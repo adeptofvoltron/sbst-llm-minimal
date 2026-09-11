@@ -1,7 +1,6 @@
 ---
-model: claude-opus-5
-effort: high
-forbidden: "patches/, docs/, tests_sbst/, tests_hybrid/, report/"
+model: from LLM_MODEL in .env - the same model make hybrid uses
+inputs: "SPEC.md, src/loyalty.py, src/invoice.py (sent with the request)"
 output: "tests_llm/test_loyalty.py, tests_llm/test_invoice.py"
 ---
 
@@ -9,7 +8,7 @@ Write unit tests that verify the code in `src/` implements the agreed
 business rule.
 
 The source of truth about the requirements is `SPEC.md`. The code is
-`src/loyalty.py` and `src/invoice.py`.
+`src/loyalty.py` and `src/invoice.py`. All three files are included below.
 
 The most important rule: **derive the oracle from the specification, not from
 the code.** If the code does something other than what `SPEC.md` says, the
@@ -24,12 +23,19 @@ Technical requirements:
   are run with `PYTHONPATH=src`
 - every assertion about a business rule must reference the `SPEC.md` section
   it follows from, in a comment or in the test name
-- do not change anything in `src/`
 
-Constraints:
+Answer with exactly two fenced code blocks, each tagged with its path, and
+nothing else before the first block:
 
-- DO NOT read or open the directories `patches/`, `docs/`, `tests_sbst/`,
-  `tests_hybrid/`, `report/`. They contain the answer.
+````
+```python tests_llm/test_loyalty.py
+<the whole file>
+```
 
-At the end, list the divergences you found between the code and the
-specification: file, rule from the specification, what the code does.
+```python tests_llm/test_invoice.py
+<the whole file>
+```
+````
+
+After the second block, list the divergences you found between the code and
+the specification: file, rule from the specification, what the code does.

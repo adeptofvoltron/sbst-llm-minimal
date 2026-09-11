@@ -209,9 +209,10 @@ def test_przelicznik_zaokraglenie_bankierskie_sekcja_1(order_value_pln, ...):
 **What to say:** the test names are sentences about the requirements, with the
 number of the specification section. Compare that with `test_case_0`.
 
-> These tests come from a run of the original Polish prompt, so their names are
-> in Polish; they are kept exactly as the model produced them. Regenerating
-> with `bash run-llm.sh prompts/llm-from-spec.md` replaces them.
+> These tests come from a run of the original Polish prompt through Claude
+> Code, so their names are in Polish; they are kept exactly as the model
+> produced them. `bash run-llm.sh prompts/llm-from-spec.md` regenerates them
+> with the model from `.env` - the same one `make hybrid` uses.
 
 Now the same validation that exposed the SBST suite - this time on this suite:
 
