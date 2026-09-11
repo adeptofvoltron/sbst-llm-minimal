@@ -5,7 +5,7 @@ __pycache__/
 .coverage
 htmlcov/
 pynguin-report/
-raport/
+report/
 *.egg-info/
 .env
 .env.*

@@ -1,113 +1,114 @@
-# Cztery komendy. Kazda trwa sekundy.
+# Four commands. Each one takes seconds.
 #
-#   make setup     - srodowisko (raz)
-#   make sbst      - wygeneruj testy przeszukiwaniem (Pynguin)
-#   make ziarna    - to samo, ale z ziarnami semantycznymi od LLM-a
-#   make hybryda   - przeszukiwanie wolajace LLM, gdy staje (wymaga .env)
-#   make pokrycie  - zmierz, co FAKTYCZNIE pokrywaja wygenerowane pliki
-#   make raport    - pokaz, co RAPORTUJE Pynguin (to nie to samo)
-#   make fwpw      - walidacja Fails Without / Passes With
-#   make czysto    - posprzataj
+#   make setup      - environment (once)
+#   make sbst       - generate tests by search (Pynguin)
+#   make seeds      - the same, but with semantic seeds from an LLM
+#   make hybrid     - search that calls an LLM when it stalls (needs .env)
+#   make coverage   - measure what the generated files ACTUALLY cover
+#   make report     - show what Pynguin REPORTS (not the same thing)
+#   make fwpw       - Fails Without / Passes With validation
+#   make clean      - tidy up
 #
-# Wszystkie cele przyjmuja MODUL=loyalty albo MODUL=invoice (domyslnie invoice)
-# oraz BUDZET=<sekundy> i ZIARNO=<seed>.
+# Every target takes MODULE=loyalty or MODULE=invoice (invoice by default),
+# plus BUDGET=<seconds> and SEED=<seed>.
 
 PYNGUIN = PYNGUIN_DANGER_AWARE=1 .venv/bin/pynguin
-BUDZET ?= 20
-ZIARNO ?= 42
-MODUL  ?= invoice
-KATALOG ?= tests_sbst
+BUDGET ?= 20
+SEED   ?= 42
+MODULE ?= invoice
+TESTS  ?= tests_sbst
 
-# Tylko dla `make hybryda`.
-PLIK_ENV   ?= .env
-MODEL_LLM  ?= gpt-4o-mini
-PLATO      ?= 25
-UDZIAL_LLM ?= 0.5
-LIMIT_LLM  ?= 5
+# For `make hybrid` only.
+ENV_FILE  ?= .env
+MODEL     ?= gpt-4o-mini
+PLATEAU   ?= 25
+LLM_SHARE ?= 0.5
+LLM_LIMIT ?= 5
 
-.PHONY: setup sbst ziarna hybryda pokrycie raport fwpw czysto
+.PHONY: setup sbst seeds hybrid coverage report fwpw clean
 
 setup:
 	uv venv --python 3.12
 	uv pip install -e '.[dev]'
 
 sbst:
-	rm -rf tests_sbst/test_$(MODUL).py
+	rm -rf tests_sbst/test_$(MODULE).py
 	$(PYNGUIN) --project-path src --output-path tests_sbst \
-	  --module-name $(MODUL) --maximum-search-time $(BUDZET) --seed $(ZIARNO) \
-	  --report-dir raport/sbst \
+	  --module-name $(MODULE) --maximum-search-time $(BUDGET) --seed $(SEED) \
+	  --report-dir report/sbst \
 	  --output_variables TargetModule,Coverage,BranchCoverage
 
-ziarna:
-	rm -rf tests_ziarna/test_$(MODUL).py
-	$(PYNGUIN) --project-path src --output-path tests_ziarna \
-	  --module-name $(MODUL) --maximum-search-time $(BUDZET) --seed $(ZIARNO) \
+seeds:
+	rm -rf tests_seeds/test_$(MODULE).py
+	$(PYNGUIN) --project-path src --output-path tests_seeds \
+	  --module-name $(MODULE) --maximum-search-time $(BUDGET) --seed $(SEED) \
 	  --initial-population-seeding True --initial-population-data seeds \
-	  --report-dir raport/ziarna \
+	  --report-dir report/seeds \
 	  --output_variables TargetModule,Coverage,BranchCoverage,FoundTestCases
 
-# Hybryda z artykulu, ale bez wlasnego pipeline'u: Pynguin 0.46 ma ten mechanizm
-# wbudowany (docs/USTALENIA.md punkt 5). Wymaga endpointu zgodnego z OpenAI.
+# The hybrid from the article, but without a pipeline of our own: Pynguin 0.46
+# ships this mechanism built in (docs/FINDINGS.md, point 5). Needs an
+# OpenAI-compatible endpoint.
 #
-# Konfiguracja idzie z $(PLIK_ENV) - wzor w .env.op. Klucz przekazujemy wylacznie
-# przez srodowisko, bo require_api_key() i tak go tam szuka, a flaga --api_key
-# byla by widoczna w `ps` i w historii powloki.
-hybryda:
-	@mkdir -p tests_hybryda
-	@rm -f tests_hybryda/test_$(MODUL).py
-	@if [ -f "$(PLIK_ENV)" ]; then set -a; . "./$(PLIK_ENV)"; set +a; fi; \
+# Configuration comes from $(ENV_FILE) - template in .env.op. The key is passed
+# through the environment only, because require_api_key() looks for it there
+# anyway, and an --api_key flag would be visible in `ps` and in shell history.
+hybrid:
+	@mkdir -p tests_hybrid
+	@rm -f tests_hybrid/test_$(MODULE).py
+	@if [ -f "$(ENV_FILE)" ]; then set -a; . "./$(ENV_FILE)"; set +a; fi; \
 	if [ -z "$$PYNGUIN_OPENAI_API_KEY$$OPENAI_API_KEY$$LLM_API_KEY" ]; then \
-	  echo "brak klucza do API."; \
-	  echo "  op run --env-file=.env.op -- make hybryda MODUL=$(MODUL)"; \
-	  echo "albo skopiuj .env.op do $(PLIK_ENV) i wstaw wartosci."; \
+	  echo "no API key."; \
+	  echo "  op run --env-file=.env.op -- make hybrid MODULE=$(MODULE)"; \
+	  echo "or copy .env.op to $(ENV_FILE) and fill in the values."; \
 	  exit 1; \
 	fi; \
-	model="$${LLM_MODEL:-$(MODEL_LLM)}"; \
-	echo "==> hybryda: $(MODUL), model $$model, budzet $(BUDZET)s, plateau $(PLATO)"; \
-	$(PYNGUIN) --project-path src --output-path tests_hybryda \
-	  --module-name $(MODUL) --maximum-search-time $(BUDZET) --seed $(ZIARNO) \
+	model="$${LLM_MODEL:-$(MODEL)}"; \
+	echo "==> hybrid: $(MODULE), model $$model, budget $(BUDGET)s, plateau $(PLATEAU)"; \
+	$(PYNGUIN) --project-path src --output-path tests_hybrid \
+	  --module-name $(MODULE) --maximum-search-time $(BUDGET) --seed $(SEED) \
 	  --model-name "$$model" \
 	  --call-llm-on-stall-detection True \
 	  --call-llm-for-uncovered-targets True \
 	  --hybrid-initial-population True \
-	  --llm-test-case-percentage $(UDZIAL_LLM) \
-	  --max-plateau-len $(PLATO) \
-	  --max-llm-interventions $(LIMIT_LLM) \
-	  --report-dir raport/hybryda \
+	  --llm-test-case-percentage $(LLM_SHARE) \
+	  --max-plateau-len $(PLATEAU) \
+	  --max-llm-interventions $(LLM_LIMIT) \
+	  --report-dir report/hybrid \
 	  --output_variables TargetModule,Coverage,BranchCoverage
 
-pokrycie:
-	@for katalog in tests_sbst tests_ziarna tests_llm tests_hybryda; do \
-	  if [ -f "$$katalog/test_$(MODUL).py" ]; then \
-	    printf "\n=== %s ===\n" "$$katalog"; \
-	    PYTHONPATH=src .venv/bin/python -m pytest "$$katalog/test_$(MODUL).py" \
-	      --cov=$(MODUL) --cov-branch --cov-report=term -q 2>&1 \
-	      | grep -E "$(MODUL).py|passed|failed" || true; \
+coverage:
+	@for dir in tests_sbst tests_seeds tests_llm tests_hybrid; do \
+	  if [ -f "$$dir/test_$(MODULE).py" ]; then \
+	    printf "\n=== %s ===\n" "$$dir"; \
+	    PYTHONPATH=src .venv/bin/python -m pytest "$$dir/test_$(MODULE).py" \
+	      --cov=$(MODULE) --cov-branch --cov-report=term -q 2>&1 \
+	      | grep -E "$(MODULE).py|passed|failed" || true; \
 	  fi; \
 	done
 
-# Pokrycie zgloszone przez Pynguina w trakcie przeszukiwania. NIE jest
-# tozsame z pokryciem wygenerowanego pliku - patrz docs/USTALENIA.md, punkt 1.
-raport:
-	@printf "\npokrycie RAPORTOWANE przez Pynguina (w trakcie przeszukiwania):\n"
-	@for w in sbst ziarna hybryda; do \
-	  if [ -f raport/$$w/statistics.csv ]; then \
-	    printf "  %-8s %s\n" "$$w" "$$(tail -1 raport/$$w/statistics.csv)"; \
+# Coverage as reported by Pynguin during the search. NOT the same as the
+# coverage of the generated file - see docs/FINDINGS.md, point 1.
+report:
+	@printf "\ncoverage REPORTED by Pynguin (during the search):\n"
+	@for r in sbst seeds hybrid; do \
+	  if [ -f report/$$r/statistics.csv ]; then \
+	    printf "  %-8s %s\n" "$$r" "$$(tail -1 report/$$r/statistics.csv)"; \
 	  fi; \
 	done
-	@printf "\npokrycie FAKTYCZNE wygenerowanych plikow (pytest-cov):\n"
-	@$(MAKE) --no-print-directory pokrycie MODUL=$(MODUL) 2>/dev/null | grep -E "===|$(MODUL).py" | sed 's/^/  /'
+	@printf "\nACTUAL coverage of the generated files (pytest-cov):\n"
+	@$(MAKE) --no-print-directory coverage MODULE=$(MODULE) 2>/dev/null | grep -E "===|$(MODULE).py" | sed 's/^/  /'
 
-# Walidacja tautologiczna: suite, ktory poprawnie wykrywa defekt, NIE
-# przechodzi na obecnym kodzie i przechodzi po nalozeniu patcha.
+# Tautological validation: a suite that correctly detects the defect does NOT
+# pass on the current code, and passes once the patch is applied.
 fwpw:
-	@printf "\n=== przed patchem (kod z defektem) ===\n"
-	@PYTHONPATH=src .venv/bin/python -m pytest $(KATALOG)/test_loyalty.py -q 2>&1 | tail -2
+	@printf "\n=== before the patch (code with the defect) ===\n"
+	@PYTHONPATH=src .venv/bin/python -m pytest $(TESTS)/test_loyalty.py -q 2>&1 | tail -2
 	@git apply patches/fix_loyalty.patch
-	@printf "\n=== po patchu (kod zgodny ze SPEC.md) ===\n"
-	@PYTHONPATH=src .venv/bin/python -m pytest $(KATALOG)/test_loyalty.py -q 2>&1 | tail -3
+	@printf "\n=== after the patch (code matching SPEC.md) ===\n"
+	@PYTHONPATH=src .venv/bin/python -m pytest $(TESTS)/test_loyalty.py -q 2>&1 | tail -3
 	@git apply -R patches/fix_loyalty.patch
-	@printf "\n(patch cofniety)\n"
+	@printf "\n(patch reverted)\n"
 
-czysto:
-	rm -rf raport .pytest_cache __pycache__ src/__pycache__ .coverage
+clean:
+	rm -rf report .pytest_cache __pycache__ src/__pycache__ .coverage

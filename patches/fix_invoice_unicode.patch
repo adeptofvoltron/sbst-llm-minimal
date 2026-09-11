@@ -1,14 +1,13 @@
 --- a/src/invoice.py
 +++ b/src/invoice.py
-@@ -2,7 +2,11 @@
+@@ -2,7 +2,10 @@
  
  import re
  
 -_PATTERN = re.compile(r"^FV/(\d{4})/(0[1-9]|1[0-2])/(\d{4})$")
-+# re.ASCII: bez tej flagi \d dopasowuje takze cyfry spoza ASCII (np.
-+# arabsko-indyjskie), a int() je konwertuje - wiec "FV/\u0662\u0660\u0662\u0666/09/0042"
-+# przechodzilo walidacje. SPEC.md sekcja 2 mowi o zapisie cyframi
-+# dziesietnymi.
++# re.ASCII: without this flag \d also matches non-ASCII digits (e.g.
++# Arabic-Indic ones) and int() converts them - so "FV/\u0662\u0660\u0662\u0666/09/0042"
++# passed validation. SPEC.md section 2 speaks of decimal digits.
 +_PATTERN = re.compile(r"^FV/(\d{4})/(0[1-9]|1[0-2])/(\d{4})$", re.ASCII)
  
  

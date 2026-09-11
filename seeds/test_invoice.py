@@ -1,12 +1,12 @@
-# Ziarna semantyczne dla Pynguina (--initial-population-seeding).
+# Semantic seeds for Pynguin (--initial-population-seeding).
 #
-# To NIE jest suite testowy - to przypadki, ktore LLM napisalby po
-# przeczytaniu SPEC.md, podane przeszukiwaniu jako populacja poczatkowa.
-# Mechanizm z CodaMosy: model dostarcza wejscia, ktorych losowanie nie
-# zgadnie, algorytm robi z nich reszte.
+# This is NOT a test suite - these are the cases an LLM would write after
+# reading SPEC.md, handed to the search as its initial population. The
+# mechanism comes from CodaMosa: the model supplies inputs that random
+# sampling will never guess, the algorithm does the rest.
 #
-# Nazwa pliku ma znaczenie: Pynguin szuka w katalogu pliku, ktorego nazwa
-# zawiera jednoczesnie nazwe modulu i "test_" (analyses/seeding.py).
+# The file name matters: Pynguin looks in the directory for a file whose name
+# contains both the module name and "test_" (analyses/seeding.py).
 import pytest
 import invoice as module_0
 

@@ -1,7 +1,7 @@
 [project]
 name = "sbst-llm-minimal"
 version = "1.0.0"
-description = "Minimalny przyklad: SBST (Pynguin) vs LLM vs hybryda, na kodzie Python bez etapu budowania"
+description = "Minimal example: SBST (Pynguin) vs LLM vs hybrid, on Python code with no build step"
 requires-python = ">=3.10,<3.15"
 dependencies = []
 
@@ -10,7 +10,7 @@ dev = [
   "pynguin==0.46.0",
   "pytest==8.4.2",
   "pytest-cov==7.0.0",
-  # Bez tego Pynguin po cichu ignoruje .env - DOTENV_AVAILABLE w
-  # pynguin/utils/openai_key_resolver.py wypada na False.
+  # Without this Pynguin silently ignores .env - DOTENV_AVAILABLE in
+  # pynguin/utils/openai_key_resolver.py comes out False.
   "python-dotenv==1.1.1",
 ]

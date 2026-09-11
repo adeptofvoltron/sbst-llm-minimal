@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Uruchamia prompt z prompts/ przez claude -p i zapisuje transkrypt.
+# Runs a prompt from prompts/ through claude -p and saves the transcript.
 set -euo pipefail
-PROMPT="${1:?podaj plik promptu}"
+PROMPT="${1:?give me a prompt file}"
 NAME="$(basename "$PROMPT" .md)"
 MODEL="$(sed -n 's/^model: *//p' "$PROMPT" | head -1)"
 EFFORT="$(sed -n 's/^effort: *//p' "$PROMPT" | head -1)"
@@ -24,11 +24,11 @@ for line in open(f"artifacts/{name}.jsonl"):
     for b in (e.get("message", {}) or {}).get("content", []) or []:
         if isinstance(b, dict) and b.get("type") == "tool_use": tools += 1
 u = res.get("usage", {}) or {}
-# Model bierzemy z frontmattera promptu, a nie z modelUsage - tam moga byc
-# takze modele pomocnicze, co przy raportowaniu wprowadza w blad.
+# The model comes from the prompt's front matter, not from modelUsage - that
+# one can also list helper models, which makes the report misleading.
 rec = {"model": model, "effort": effort, "turns": res.get("num_turns"),
        "costUSD": res.get("total_cost_usd"), "outputTokens": u.get("output_tokens"),
        "toolCalls": tools}
 json.dump(rec, open(f"artifacts/{name}.usage.json", "w"), indent=2)
-print(f"    tur: {rec['turns']}, wywolan narzedzi: {tools}, koszt: {rec['costUSD']} USD")
+print(f"    turns: {rec['turns']}, tool calls: {tools}, cost: {rec['costUSD']} USD")
 PY

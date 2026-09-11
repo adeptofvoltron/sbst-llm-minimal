@@ -1,4 +1,4 @@
-"""Punkty lojalnosciowe. Regula biznesowa: SPEC.md, sekcja 1."""
+"""Loyalty points. Business rule: SPEC.md, section 1."""
 
 VIP_THRESHOLD_PLN = 5000
 POINTS_CAP = 5000

@@ -5,8 +5,8 @@
          raise ValueError("amounts must not be negative")
  
 -    points = int(order_value_pln // 10)
-+    # round() w Pythonie to zaokraglenie bankierskie - dokladnie to, czego
-+    # wymaga SPEC.md sekcja 1.
++    # round() in Python is banker's rounding - exactly what SPEC.md
++    # section 1 asks for.
 +    points = round(order_value_pln / 10)
  
 -    if lifetime_spend_pln > VIP_THRESHOLD_PLN:

@@ -1,56 +1,57 @@
-# SBST vs LLM vs hybryda - minimalny przyklad
+# SBST vs LLM vs hybrid - a minimal example
 
-Ten sam eksperyment co w
+The same experiment as in
 [ai-kielce-prezentacja](https://github.com/adeptofvoltron/ai-kielce-prezentacja),
-ale sprowadzony do **czterdziestu linii kodu produkcyjnego** i narzedzia,
-ktore nie wymaga zadnego etapu budowania.
+boiled down to **forty lines of production code** and a tool that needs no
+build step at all.
 
-Dlaczego Python: **narzedzia SBST natywnego dla TypeScriptu nie ma.** Sprawdzone
-na npm - jedyne trafienie na "sbst" to klient REST do EvoMastera, `jsfuzz`
-porzucony w 2022. Dla JS/TS zostaje SynTest, ktory nie parsuje TypeScriptu,
-wiec wymaga `tsc`, mapowania modulow i transformacji wyniku (siedem obejsc,
-opisanych w tamtym repozytorium).
+Why Python: **there is no SBST tool native to TypeScript.** Checked on npm -
+the only hit for "sbst" is a REST client for EvoMaster, and `jsfuzz` was
+abandoned in 2022. For JS/TS that leaves SynTest, which does not parse
+TypeScript, so it needs `tsc`, module mapping and a transformation of its
+output (seven workarounds, described in that other repository).
 
-**Pynguin** dla Pythona nie wymaga niczego z tej listy. Zadnego builda,
-zadnej konfiguracji. To dodatkowo dokladnie ten tool, na ktorym zbudowano
-**CodaMose** - hybryde cytowana w artykule.
+**Pynguin** for Python needs none of that. No build, no configuration. It is
+also exactly the tool **CodaMosa** was built on - the hybrid cited in the
+article.
 
 ```
-przeszukiwanie jednego modulu:  3 sekundy
-caly setup:                     dwie komendy
-kod produkcyjny:                40 linii
+search over one module:  3 seconds
+the whole setup:         two commands
+production code:         40 lines
 ```
 
-## Wynik w jednej tabeli
+## The result in one table
 
-`make pokrycie MODUL=invoice` - faktyczne pokrycie wygenerowanych plikow,
-mierzone `pytest-cov`, nie raportowane przez narzedzie:
+`make coverage MODULE=invoice` - actual coverage of the generated files,
+measured with `pytest-cov`, not as reported by the tool:
 
-| | testow | pokrycie `invoice.py` | rozbieznosc ze SPEC |
+| | tests | coverage of `invoice.py` | divergence from SPEC |
 |---|---|---|---|
-| SBST (Pynguin, 20 s) | 1 | **35%** | utrwalona |
-| SBST + ziarna semantyczne | 4 | **35%** | utrwalona |
-| LLM ze specyfikacja | 50 | **100%** | **wykryta** |
+| SBST (Pynguin, 20 s) | 1 | **35%** | cemented in |
+| SBST + semantic seeds | 4 | **35%** | cemented in |
+| LLM with the specification | 50 | **100%** | **detected** |
 
-Trzy rzeczy, ktore z tego wynikaja i ktorych nie planowalismy:
+Three things that follow from this, none of which we planned:
 
-1. **Ziarna podniosly pokrycie raportowane przez Pynguina z 22,2% na 88,9%,
-   a pokrycie wygenerowanego pliku ani o punkt.** Mierz artefakt, nie raport.
-2. **LLM ze specyfikacja znalazl defekt, ktorego nikt nie zasial**: `\d`
-   w Pythonie dopasowuje cyfry Unicode, wiec `FV/٢٠٢٦/09/0042` przechodzilo
-   walidacje, a `int()` grzecznie zwracalo `2026`.
-3. **Hybryda z artykulu jest w Pynguinie flaga**, nie pipeline'em -
+1. **Seeds raised the coverage Pynguin reports from 22.2% to 88.9%, and the
+   coverage of the generated file by not a single point.** Measure the
+   artifact, not the report.
+2. **The LLM with the specification found a defect nobody planted**: `\d` in
+   Python matches Unicode digits, so `FV/٢٠٢٦/09/0042` passed validation and
+   `int()` politely returned `2026`.
+3. **The hybrid from the article is a flag in Pynguin**, not a pipeline -
    `--call-llm-on-stall-detection`, `--max-plateau-len`, `--llm-url`.
 
-Szczegoly kazdej z nich: [`docs/USTALENIA.md`](docs/USTALENIA.md).
+Details of each: [`docs/FINDINGS.md`](docs/FINDINGS.md).
 
 ---
 
-## Chcesz to pokazac?
+## Want to present this?
 
-[`KROK-PO-KROKU.md`](KROK-PO-KROKU.md) - osiem komend, najdluzsza 3 sekundy,
-zero wywolan API. Kazda komenda i kazdy oczekiwany wynik zostaly wykonane
-dokladnie tak, jak sa zapisane.
+[`STEP-BY-STEP.md`](STEP-BY-STEP.md) - eight commands, the longest one takes 3
+seconds, zero API calls. Every command and every expected result was run
+exactly as written down.
 
 ---
 
@@ -62,20 +63,20 @@ cd sbst-llm-minimal
 make setup
 ```
 
-`make setup` robi `uv venv --python 3.12` i `uv pip install -e '.[dev]'`.
-Bez `uv`:
+`make setup` runs `uv venv --python 3.12` and `uv pip install -e '.[dev]'`.
+Without `uv`:
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 ```
 
-Wymagany Python 3.10-3.14 (Pynguin 0.46 nie wspiera 3.15+).
+Requires Python 3.10-3.14 (Pynguin 0.46 does not support 3.15+).
 
 ---
 
-## Kod, ktory dziala i realizuje zla regule
+## Code that works and implements the wrong rule
 
-`src/loyalty.py`, caly:
+`src/loyalty.py`, in full:
 
 ```python
 def award_points(order_value_pln: float, lifetime_spend_pln: float) -> int:
@@ -92,21 +93,20 @@ def award_points(order_value_pln: float, lifetime_spend_pln: float) -> int:
     return points
 ```
 
-`SPEC.md` sekcja 1 mowi dwie rzeczy inaczej:
+`SPEC.md` section 1 says two things differently:
 
-- punkty zaokraglamy **metoda bankierska** - a `//` obcina w dol,
-- VIP to suma zakupow **co najmniej** 5000 zl - a w kodzie jest `>`.
+- points are rounded using **banker's rounding** - and `//` truncates,
+- VIP means a lifetime spend of **at least** 5000 PLN - and the code has `>`.
 
-Smaczek dla Pythona: `round()` **jest** zaokragleniem bankierskim
-(`round(2.5) == 2`, `round(3.5) == 4`). Poprawka to jedna linia -
-patrz `patches/fix_loyalty.patch`.
+A Python detail: `round()` **is** banker's rounding (`round(2.5) == 2`,
+`round(3.5) == 4`). The fix is one line - see `patches/fix_loyalty.patch`.
 
 ---
 
-## Krok 1: SBST generuje testy z zachowania kodu (3 s)
+## Step 1: SBST generates tests from the behaviour of the code (3 s)
 
 ```bash
-make sbst MODUL=loyalty
+make sbst MODULE=loyalty
 ```
 
 ```python
@@ -116,8 +116,9 @@ def test_case_0():
     assert int_0 == 171
 ```
 
-`1716.363 / 10 = 171.6363`. Specyfikacja wymaga `172`. Kod zwraca `171`,
-bo obcina w dol - i test wlasnie to przypial jako oczekiwanie.
+`1716.363 / 10 = 171.6363`. The specification requires `172`. The code returns
+`171` because it truncates - and the test pinned exactly that as the
+expectation.
 
 ```bash
 PYTHONPATH=src .venv/bin/python -m pytest tests_sbst/test_loyalty.py -q
@@ -127,65 +128,67 @@ PYTHONPATH=src .venv/bin/python -m pytest tests_sbst/test_loyalty.py -q
 3 passed
 ```
 
-Zielono - i nie moglo byc inaczej.
+Green - and it could not have been otherwise.
 
 ---
 
-## Krok 2: naprawiamy kod, testy sie psuja (1 s)
+## Step 2: we fix the code, the tests break (1 s)
 
 ```bash
 make fwpw
 ```
 
 ```
-=== przed patchem (kod z defektem) ===
+=== before the patch (code with the defect) ===
 3 passed in 0.01s
 
-=== po patchu (kod zgodny ze SPEC.md) ===
+=== after the patch (code matching SPEC.md) ===
 FAILED tests_sbst/test_loyalty.py::test_case_0 - assert 172 == 171
 FAILED tests_sbst/test_loyalty.py::test_case_2 - assert 438 == 437
 2 failed, 1 passed in 0.02s
 
-(patch cofniety)
+(patch reverted)
 ```
 
-**`assert 172 == 171`** - jedna linia, ktora mowi wszystko. Naprawa zgodna
-ze specyfikacja lamie testy. Suite dziala jako zapora regresji chroniaca blad.
+**`assert 172 == 171`** - one line that says everything. A fix that matches the
+specification breaks the tests. The suite works as a regression barrier
+protecting a bug.
 
-To nie awaria narzedzia. To jego zalozenie: kod jest zrodlem prawdy o tym,
-co ma sie dziac. Nazywa sie to **walidacja tautologiczna**
-(Fails Without / Passes With) i jest jedynym sposobem odroznienia
-"test wykryl blad" od "test utrwalil blad".
+This is not a failure of the tool. It is its premise: the code is the source of
+truth about what should happen. This is called **tautological validation**
+(Fails Without / Passes With) and it is the only way to tell "the test caught a
+bug" apart from "the test cemented a bug".
 
 ---
 
-## Krok 3: bramka formatu (3 s)
+## Step 3: the format gate (3 s)
 
-`src/invoice.py` ma jedna linie, ktora decyduje o wszystkim:
+`src/invoice.py` has one line that decides everything:
 
 ```python
 _PATTERN = re.compile(r"^FV/(\d{4})/(0[1-9]|1[0-2])/(\d{4})$")
 ```
 
 ```bash
-make sbst MODUL=invoice
+make sbst MODULE=invoice
 cat tests_sbst/test_invoice.py
 ```
 
-Cale wygenerowane testy:
+The generated tests, in full:
 
 ```python
 def test_case_0():
-    str_0 = "!0s"
+    str_0 = "s"
     with pytest.raises(ValueError):
         module_0.parse_invoice_id(str_0)
 ```
 
-**Jeden test. Losowy string. Wyjatek.** Cala logika za bramka - zakres roku,
-zerowy numer kolejny, zwracany slownik - jest nietkniete.
+**One test. A random string. An exception.** All the logic behind the gate -
+the year range, the zero sequence number, the returned dictionary - is
+untouched.
 
 ```bash
-make pokrycie MODUL=invoice
+make coverage MODULE=invoice
 ```
 
 ```
@@ -195,79 +198,86 @@ src/invoice.py      14      8      6      1    35%
 
 ---
 
-## Krok 4: ziarna semantyczne (3 s)
+## Step 4: semantic seeds (3 s)
 
-`seeds/test_invoice.py` to trzy przypadki, ktore LLM napisalby po przeczytaniu
-`SPEC.md` - podane przeszukiwaniu jako **populacja poczatkowa**. Mechanizm
-z CodaMosy, w Pynguinie dostepny jako flaga:
+`seeds/test_invoice.py` holds three cases an LLM would write after reading
+`SPEC.md` - handed to the search as its **initial population**. The mechanism
+comes from CodaMosa and is available in Pynguin as a flag:
 
 ```bash
-make ziarna MODUL=invoice
+make seeds MODULE=invoice
 ```
 
-Pynguin raportuje:
+Pynguin reports:
 
-| | pokrycie galezi (raport Pynguina) |
+| | branch coverage (Pynguin's report) |
 |---|---|
-| bez ziaren | **22,2%** |
-| z ziarnami | **88,9%** (`FoundTestCases: 3`) |
+| without seeds | **22.2%** |
+| with seeds | **88.9%** (`FoundTestCases: 3`) |
 
-Cztery razy wiecej, przy tym samym ziarnie losowym i tym samym budzecie.
+Four times as much, at the same random seed and the same budget.
 
-**Ale to nie jest cala prawda** - i to jest najciekawsza rzecz w tym
-repozytorium. Patrz [`docs/USTALENIA.md`](docs/USTALENIA.md), punkt 1.
-
----
-
-## Krok 5: LLM ze specyfikacja
-
-Testy sa zacommitowane, wiec ten krok nie wymaga klucza API. Prompt jest
-w [`prompts/llm-ze-spec.md`](prompts/llm-ze-spec.md) razem z uzytym modelem
-i poziomem effortu, transkrypt z kazdym wywolaniem narzedzia w `artifacts/`.
-
-```bash
-make pokrycie MODUL=loyalty
-make fwpw KATALOG=tests_llm
-```
-
-Zeby wygenerowac od nowa (wymaga Claude Code):
-
-```bash
-bash run-llm.sh prompts/llm-ze-spec.md
-```
+**But that is not the whole truth** - and it is the most interesting thing in
+this repository. See [`docs/FINDINGS.md`](docs/FINDINGS.md), point 1.
 
 ---
 
-## Wszystkie komendy
+## Step 5: the LLM with the specification
 
-| Komenda | Co robi | Czas |
+The tests are committed, so this step needs no API key. The prompt is in
+[`prompts/llm-from-spec.md`](prompts/llm-from-spec.md) together with the model
+and effort level used, and the transcript with every tool call is in
+`artifacts/`.
+
+```bash
+make coverage MODULE=loyalty
+make fwpw TESTS=tests_llm
+```
+
+To regenerate from scratch (requires Claude Code):
+
+```bash
+bash run-llm.sh prompts/llm-from-spec.md
+```
+
+> The committed `tests_llm/` and `artifacts/` come from a run of the original
+> Polish prompt, which is why the generated test names are in Polish. They are
+> kept byte for byte as the model produced them; regenerating with the prompt
+> above replaces both.
+
+---
+
+## All the commands
+
+| Command | What it does | Time |
 |---|---|---|
-| `make setup` | srodowisko | ~20 s |
-| `make sbst MODUL=loyalty` | przeszukiwanie | 3 s |
-| `make ziarna MODUL=invoice` | przeszukiwanie z ziarnami | 3 s |
-| `make hybryda MODUL=invoice` | przeszukiwanie wolajace LLM, gdy staje - **wymaga klucza**, patrz `.env.op` | ~1 min |
-| `make pokrycie MODUL=invoice` | faktyczne pokrycie wygenerowanych plikow | 1 s |
-| `make raport MODUL=invoice` | raport Pynguina **obok** faktycznego pokrycia | 2 s |
-| `make fwpw` | walidacja Fails Without / Passes With | 1 s |
-| `make czysto` | porzadki | - |
+| `make setup` | environment | ~20 s |
+| `make sbst MODULE=loyalty` | search | 3 s |
+| `make seeds MODULE=invoice` | search with seeds | 3 s |
+| `make hybrid MODULE=invoice` | search that calls an LLM when it stalls - **needs a key**, see `.env.op` | ~1 min |
+| `make coverage MODULE=invoice` | actual coverage of the generated files | 1 s |
+| `make report MODULE=invoice` | Pynguin's report **next to** the actual coverage | 2 s |
+| `make fwpw` | Fails Without / Passes With validation | 1 s |
+| `make clean` | tidy up | - |
 
-Zmienne: `MODUL` (`loyalty` \| `invoice`), `BUDZET` (sekundy),
-`ZIARNO` (seed), `KATALOG` (`tests_sbst` \| `tests_llm` \| `tests_ziarna`).
-Dla `hybryda` dodatkowo: `PLATO` (ile iteracji bez postepu przed wolaniem
-LLM-a), `UDZIAL_LLM`, `LIMIT_LLM`, `PLIK_ENV`.
+Variables: `MODULE` (`loyalty` \| `invoice`), `BUDGET` (seconds),
+`SEED` (random seed), `TESTS` (`tests_sbst` \| `tests_llm` \| `tests_seeds`).
+For `hybrid` additionally: `PLATEAU` (how many iterations without progress
+before the LLM is called), `LLM_SHARE`, `LLM_LIMIT`, `ENV_FILE`.
 
-Wszystko poza `make hybryda` dziala **bez klucza do API** i bez dostepu do
-sieci. `make hybryda` jako jedyne wymaga endpointu zgodnego z OpenAI -
-konfiguracja w `.env` (wzor: `.env.op`, `.env` jest w `.gitignore`).
+Everything except `make hybrid` runs **without an API key** and without network
+access. `make hybrid` is the only target that needs an OpenAI-compatible
+endpoint - configured in `.env` (template: `.env.op`; `.env` is in
+`.gitignore`).
 
 ---
 
-## Co dalej
+## What next
 
-- [`docs/USTALENIA.md`](docs/USTALENIA.md) - co wyszlo, w tym pulapka
-  pomiarowa Pynguina i **defekt, ktorego nikt nie zasial**: `\d` w Pythonie
-  dopasowuje cyfry Unicode, wiec `FV/٢٠٢٦/09/0042` przechodzilo walidacje
-- [`SPEC.md`](SPEC.md) - wymagania, czyli oracle
-- pelna wersja eksperymentu z mutation testing, piecioma wariantami LLM
-  i hybryda czterostopniowa:
+- [`docs/FINDINGS.md`](docs/FINDINGS.md) - what came out, including Pynguin's
+  measurement trap and **the defect nobody planted**: `\d` in Python matches
+  Unicode digits, so `FV/٢٠٢٦/09/0042` passed validation
+- [`SPEC.md`](SPEC.md) - the requirements, i.e. the oracle
+- the full version of the experiment, with mutation testing, five LLM variants
+  and a four-stage hybrid:
   [ai-kielce-prezentacja](https://github.com/adeptofvoltron/ai-kielce-prezentacja)

@@ -1,4 +1,4 @@
-"""Identyfikator faktury. Regula biznesowa: SPEC.md, sekcja 2."""
+"""Invoice identifier. Business rule: SPEC.md, section 2."""
 
 import re
 
