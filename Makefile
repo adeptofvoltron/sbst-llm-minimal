@@ -50,6 +50,11 @@ seeds:
 # ships this mechanism built in (docs/FINDINGS.md, point 5). Needs an
 # OpenAI-compatible endpoint.
 #
+# --algorithm LLMOSA is load-bearing. Every --call-llm-* flag below lives in
+# LLMOSAAlgorithm, and the default DYNAMOSA ignores all of them without a word:
+# the run succeeds, writes the flags into pynguin-config.toml and produces a
+# plain SBST suite. docs/FINDINGS.md point 9.
+#
 # Configuration comes from $(ENV_FILE) - template in .env.op. The key is passed
 # through the environment only, because require_api_key() looks for it there
 # anyway, and an --api_key flag would be visible in `ps` and in shell history.
@@ -67,6 +72,7 @@ hybrid:
 	echo "==> hybrid: $(MODULE), model $$model, budget $(BUDGET)s, plateau $(PLATEAU)"; \
 	$(PYNGUIN) --project-path src --output-path tests_hybrid \
 	  --module-name $(MODULE) --maximum-search-time $(BUDGET) --seed $(SEED) \
+	  --algorithm LLMOSA \
 	  --model-name "$$model" \
 	  --call-llm-on-stall-detection True \
 	  --call-llm-for-uncovered-targets True \
@@ -75,7 +81,9 @@ hybrid:
 	  --max-plateau-len $(PLATEAU) \
 	  --max-llm-interventions $(LLM_LIMIT) \
 	  --report-dir report/hybrid \
-	  --output_variables TargetModule,Coverage,BranchCoverage
+	  --output_variables TargetModule,Coverage,BranchCoverage,TotalLLMCalls,\
+TotalLLMInputTokens,TotalLLMOutputTokens,TotalCodelessLLMResponses,\
+LLMTotalParsedStatements,LLMTotalStatements,TotalLTCs
 
 coverage:
 	@for dir in tests_sbst tests_seeds tests_llm tests_hybrid; do \

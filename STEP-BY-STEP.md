@@ -313,9 +313,12 @@ cp .env.op .env          # fill in the key; .env is in .gitignore
 make hybrid MODULE=invoice
 ```
 
-Two traps along the way (`docs/FINDINGS.md` point 8): without `python-dotenv`
-Pynguin ignores `.env` without a word, and `LLM_MODEL` from the environment
-loses to the non-empty default `gpt-4o-mini`.
+Traps along the way, all in `docs/FINDINGS.md` points 8 and 9: without
+`python-dotenv` Pynguin ignores `.env` without a word, `LLM_MODEL` from the
+environment loses to the non-empty default `gpt-4o-mini`, and - the expensive
+one - every `--call-llm-*` flag is silently inert unless you also pass
+`--algorithm LLMOSA`, because the algorithm defaults to DYNAMOSA. The run
+succeeds either way and hands you a plain SBST suite.
 
 ---
 
@@ -337,3 +340,7 @@ git status --short      # should be empty
 | `Provided testcases are not used.` | `--initial-population-data` has to point at a **directory**, and the file inside it has to be named `test_<module>.py` |
 | numbers different from the ones in this document | `BUDGET` or `SEED` changed; the search is stochastic |
 | `make setup` does not work | no `uv`; use `python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'` |
+| `make hybrid` gives the same numbers as `make sbst` | the `--call-llm-*` flags need `--algorithm LLMOSA`; without it they are recorded and ignored |
+| `AttributeError: 'str' object has no attribute 'get_secret_value'` | `pydantic` missing; it is in `.[dev]`, so re-run `make setup` |
+| `NameError: name 'openai' is not defined` | the `openai` client missing; likewise in `.[dev]` |
+| `ValueError: Unexpected node inside JoinedStr` | Pynguin failed to unparse an f-string the model returned; re-run, it does not reproduce reliably |

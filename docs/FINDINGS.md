@@ -113,6 +113,10 @@ make hybrid MODULE=invoice
 The rest of the repository runs **without a key** - `make hybrid` is the only
 target that needs one and the only one that touches the network.
 
+With one large caveat that cost us four failed runs: **those flags do nothing
+on their own.** They also need `--algorithm LLMOSA` and three packages Pynguin
+does not declare. Point 9.
+
 ## 6. The LLM with the specification found a defect nobody planted
 
 The code held **two** deliberate divergences (the rounding and the VIP
@@ -215,3 +219,108 @@ a say. The inconsistency concerns the model only.
 
 By the way: the key is passed **through the environment only**, never via
 `--api_key`. Flags are visible in `ps` and in shell history.
+
+## 9. Turning the hybrid on takes one undocumented flag and three undeclared packages
+
+Point 5 says the hybrid is a handful of flags. That is true and it is not
+enough. Setting the flags from point 5 and nothing else produces a run that
+**succeeds and is indistinguishable from plain SBST**:
+
+```
+report/hybrid/statistics.csv    "invoice","0.2222222222222222","0.2222222222222222"
+tests_hybrid/test_invoice.py    one test, a random string, an exception
+```
+
+Exactly the numbers `make sbst` produces. No error, no warning. And
+`report/hybrid/pynguin-config.toml` faithfully records every flag as requested:
+
+```toml
+hybrid_initial_population = true
+call_llm_on_stall_detection = true
+max_llm_interventions = 5
+```
+
+**The flags live in `LLMOSAAlgorithm`, and the algorithm defaults to
+DYNAMOSA.** `configuration.py:1014` says `algorithm: Algorithm =
+Algorithm.DYNAMOSA`, and every `--call-llm-*` branch sits in
+`ga/algorithms/llmosalgorithm.py`, which `generationalgorithmfactory.py` only
+instantiates for `Algorithm.LLMOSA`. Without `--algorithm LLMOSA` the whole LLM
+subsystem is never constructed. The tell is the one worth keeping: ask for the LLM
+output variables and they are **absent from `statistics.csv`**, because nothing
+ever tracked them. That is why `make hybrid` requests them - they are the
+cheapest way to tell a working hybrid from an inert one. Under `LLMOSA` they
+show up and read like this:
+
+```
+TotalLLMCalls               2
+TotalLLMInputTokens         594
+TotalLLMOutputTokens        1857
+TotalCodelessLLMResponses   0
+LLMTotalParsedStatements    59      (of 86 returned)
+TotalLTCs                   5       (test cases merged into the population)
+```
+
+Then three packages Pynguin 0.46 uses but does not depend on. All three fail
+only once the LLM path is actually reached, which is why they surface one at a
+time:
+
+| missing | what happens |
+|---|---|
+| `python-dotenv` | `.env` is ignored without a word (point 8) |
+| `pydantic` | `AttributeError: 'str' object has no attribute 'get_secret_value'` |
+| `openai` | `NameError: name 'openai' is not defined` |
+
+The last two are the same broken-guard bug twice. `openai_key_resolver.py`
+falls back to `SecretStr = str` on ImportError and then calls
+`.get_secret_value()` on the result. `llmagent.py` sets `OPENAI_AVAILABLE` on
+ImportError and never reads it - unlike `utils/llm.py` and
+`refinement/llm_client.py`, which do check the same flag. Hence `pydantic` and
+`openai` pinned in `pyproject.toml` next to `python-dotenv`.
+
+Once all four pieces are in place, the hybrid does the thing the seeds could
+not (point 1) - the model's inputs survive into the **exported** suite:
+
+```python
+def test_case_1():
+    str_0 = "FV/1999/12/1234"
+    with pytest.raises(ValueError):
+        module_0.parse_invoice_id(str_0)
+
+
+def test_case_2():
+    str_0 = "   FV/2021/01/00v0   "
+    with pytest.raises(ValueError):
+        module_0.parse_invoice_id(str_0)
+
+
+def test_case_4():
+    str_0 = "FV/2101/01/1234"
+    with pytest.raises(ValueError):
+        module_0.parse_invoice_id(str_0)
+```
+
+Real invoice numbers: both ends of the year range, and the surrounding
+whitespace the specification says to ignore. `grep -c 'FV/'` on the seeds suite
+returns 0; here it returns 4.
+
+The numbers move between runs far more than anywhere else in this repository,
+because both the search and the model are stochastic. Two runs at the default
+budget:
+
+| | tests | Pynguin reports | `pytest-cov` measures |
+|---|---|---|---|
+| first | 6 | 100% | 90% |
+| second (committed) | 5 | 88.9% | 70% |
+
+Against 35% for SBST and for seeds. The measurement gap from point 1 is still
+there - reported above measured, both times - it is just much smaller.
+
+What the hybrid does **not** do is change where the oracle comes from. Every
+assertion above is `pytest.raises`, mirroring what the code does; the model
+contributed inputs, not expectations. Coverage and oracle are separate axes,
+and the hybrid moves only the first.
+
+One flake worth knowing about: a run can die with
+`ValueError: Unexpected node inside JoinedStr` from `ast._write_fstring_inner`
+while Pynguin unparses a test case the model returned. It hit us once in four
+runs and did not reproduce.

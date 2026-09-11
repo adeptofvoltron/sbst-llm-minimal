@@ -13,4 +13,11 @@ dev = [
   # Without this Pynguin silently ignores .env - DOTENV_AVAILABLE in
   # pynguin/utils/openai_key_resolver.py comes out False.
   "python-dotenv==1.1.1",
+  # Same file, same pattern, worse ending: without pydantic it falls back to
+  # SecretStr = str and then calls .get_secret_value() on it. See
+  # docs/FINDINGS.md point 9.
+  "pydantic==2.12.3",
+  # And the client itself. llmagent.py sets OPENAI_AVAILABLE and then never
+  # reads it, so without this you get NameError: name 'openai' is not defined.
+  "openai==3.13.0",
 ]

@@ -30,7 +30,15 @@ measured with `pytest-cov`, not as reported by the tool:
 |---|---|---|---|
 | SBST (Pynguin, 20 s) | 1 | **35%** | cemented in |
 | SBST + semantic seeds | 4 | **35%** | cemented in |
+| SBST + LLM on stall (hybrid) | 5-6 | **70-90%** | not detected |
 | LLM with the specification | 50 | **100%** | **detected** |
+
+The hybrid row needs a key and varies between runs - two runs gave 6 tests at
+90% and 5 tests at 70%; the committed suite is the second. The other rows are
+deterministic and run offline. The hybrid clears 35% because the model supplies
+**inputs** the search cannot guess, and it still detects nothing, because the
+assertions keep coming from running the code. Coverage and oracle are separate
+axes, and only the last row moves the second one.
 
 Three things that follow from this, none of which we planned:
 
@@ -41,7 +49,10 @@ Three things that follow from this, none of which we planned:
    Python matches Unicode digits, so `FV/٢٠٢٦/09/0042` passed validation and
    `int()` politely returned `2026`.
 3. **The hybrid from the article is a flag in Pynguin**, not a pipeline -
-   `--call-llm-on-stall-detection`, `--max-plateau-len`, `--llm-url`.
+   `--call-llm-on-stall-detection`, `--max-plateau-len`, `--llm-url`. Set those
+   flags alone and you get a run that succeeds, records them in its config and
+   ignores every one of them: they only take effect under
+   `--algorithm LLMOSA`, and the algorithm defaults to DYNAMOSA.
 
 Details of each: [`docs/FINDINGS.md`](docs/FINDINGS.md).
 
