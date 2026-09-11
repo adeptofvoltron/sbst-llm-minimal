@@ -31,14 +31,18 @@ measured with `pytest-cov`, not as reported by the tool:
 | SBST (Pynguin, 20 s) | 1 | **35%** | cemented in |
 | SBST + semantic seeds | 4 | **35%** | cemented in |
 | SBST + LLM on stall (hybrid) | 5-6 | **70-90%** | not detected |
-| LLM with the specification | 50 | **100%** | **detected** |
+| LLM with the spec, `gpt-4o-mini` | 4 | **100%** | not detected |
+| LLM with the spec, `claude-opus-5` | 50 | **100%** | **detected** |
 
 The hybrid row needs a key and varies between runs - two runs gave 6 tests at
-90% and 5 tests at 70%; the committed suite is the second. The other rows are
-deterministic and run offline. The hybrid clears 35% because the model supplies
-**inputs** the search cannot guess, and it still detects nothing, because the
-assertions keep coming from running the code. Coverage and oracle are separate
-axes, and only the last row moves the second one.
+90% and 5 tests at 70%; the committed suite is the second. The SBST and LLM
+rows are committed and run offline.
+
+Note the bottom two rows: **same prompt, same specification, same code, 100%
+coverage both times, and only one of them detects anything.** Coverage and
+oracle are separate axes; the last column is the one that matters and no
+percentage predicts it. Details in [`docs/FINDINGS.md`](docs/FINDINGS.md),
+point 10.
 
 Three things that follow from this, none of which we planned:
 
@@ -255,11 +259,19 @@ op run --env-file=.env.op -- bash run-llm.sh prompts/llm-from-spec.md
 ```
 
 `run-llm.sh` uses the same configuration as `make hybrid` - `LLM_MODEL`,
-`LLM_BASE_URL` and the key from `.env` - so the LLM-only row and the hybrid row
-of the table run on the same model, and the comparison is about the method
-rather than about the model. A plain chat completion has no tools, so the
-script sends `SPEC.md` and both source files with the request and writes the
-two files out of the reply; the model never sees the rest of the repository.
+`LLM_BASE_URL` and the key from `.env`. A plain chat completion has no tools,
+so the script sends `SPEC.md` and both source files with the request and writes
+the two files out of the reply; the model never sees the rest of the
+repository.
+
+`TESTS_DIR` picks where the suite lands, so two models can be compared side by
+side. That is how `tests_llm_mini/` was produced, and comparing it with
+`tests_llm/` turned out to be the sharpest result in the repository - see
+[`docs/FINDINGS.md`](docs/FINDINGS.md), point 10:
+
+```bash
+TESTS_DIR=tests_llm_mini bash run-llm.sh prompts/llm-from-spec.md
+```
 
 > The committed `tests_llm/` predates this: it comes from a run of the original
 > Polish prompt through Claude Code, which is why the generated test names are
@@ -284,7 +296,8 @@ two files out of the reply; the model never sees the rest of the repository.
 | `make clean` | tidy up | - |
 
 Variables: `MODULE` (`loyalty` \| `invoice`), `BUDGET` (seconds),
-`SEED` (random seed), `TESTS` (`tests_sbst` \| `tests_llm` \| `tests_seeds`).
+`SEED` (random seed), `TESTS` (`tests_sbst` \| `tests_llm` \| `tests_llm_mini`
+\| `tests_seeds` \| `tests_hybrid`).
 For `hybrid` additionally: `PLATEAU` (how many iterations without progress
 before the LLM is called), `LLM_SHARE`, `LLM_LIMIT`, `ENV_FILE`.
 

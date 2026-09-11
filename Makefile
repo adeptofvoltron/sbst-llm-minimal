@@ -86,7 +86,7 @@ TotalLLMInputTokens,TotalLLMOutputTokens,TotalCodelessLLMResponses,\
 LLMTotalParsedStatements,LLMTotalStatements,TotalLTCs
 
 coverage:
-	@for dir in tests_sbst tests_seeds tests_llm tests_hybrid; do \
+	@for dir in tests_sbst tests_seeds tests_llm tests_llm_mini tests_hybrid; do \
 	  if [ -f "$$dir/test_$(MODULE).py" ]; then \
 	    printf "\n=== %s ===\n" "$$dir"; \
 	    PYTHONPATH=src .venv/bin/python -m pytest "$$dir/test_$(MODULE).py" \

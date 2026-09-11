@@ -249,6 +249,11 @@ FAILED tests_llm/test_invoice.py::test_walidacja_cyfry_spoza_ascii_sekcja_2
 **What to say:** one test fails and it has nothing to do with rounding. The
 code held **two** planted divergences. This one is the third.
 
+> If there is time for one more beat: `tests_llm_mini/` is the same prompt and
+> the same specification through `gpt-4o-mini`. Also 100% coverage, nine tests,
+> and `make fwpw TESTS=tests_llm_mini` goes from 2 failures to **3** - the
+> wrong way. `docs/FINDINGS.md` point 10.
+
 ---
 
 ## 7. The defect nobody planted (1 min)

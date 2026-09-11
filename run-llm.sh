@@ -15,6 +15,9 @@ set -euo pipefail
 
 PROMPT="${1:?give me a prompt file}"
 ENV_FILE="${ENV_FILE:-.env}"
+# Where the generated files land. Point it elsewhere to compare two models
+# without one overwriting the other's suite.
+export TESTS_DIR="${TESTS_DIR:-tests_llm}"
 
 if [ -f "$ENV_FILE" ]; then set -a; . "./$ENV_FILE"; set +a; fi
 
@@ -82,16 +85,20 @@ if choice.get("finish_reason") == "length":
 
 # The model returns each file in its own fence, tagged with the path.
 FENCE = re.compile(r"^```(?:python)?[ \t]+(\S+)[ \t]*\n(.*?)^```", re.S | re.M)
+out_dir = pathlib.Path(os.environ.get("TESTS_DIR", "tests_llm"))
 written = {}
 for path, code in FENCE.findall(answer):
-    p = pathlib.Path(path)
-    if p.suffix != ".py" or not str(p).startswith("tests_llm/"):
+    src = pathlib.Path(path)
+    if src.suffix != ".py" or src.parent.name != "tests_llm":
         continue
+    # The prompt names tests_llm/ so the model writes the imports and paths it
+    # would write for real; TESTS_DIR decides where the file actually lands.
+    p = out_dir / src.name
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(code)
-    written[str(p)] = len(code.splitlines())
+    written[src.name] = len(code.splitlines())
 
-expected = {"tests_llm/test_loyalty.py", "tests_llm/test_invoice.py"}
+expected = {"test_loyalty.py", "test_invoice.py"}
 missing = expected - written.keys()
 if missing:
     sys.exit(f"    the reply did not contain {', '.join(sorted(missing))}; "
@@ -101,11 +108,11 @@ u = resp.get("usage", {}) or {}
 rec = {"model": resp.get("model", model), "endpoint": base,
        "promptTokens": u.get("prompt_tokens"),
        "completionTokens": u.get("completion_tokens"),
-       "files": written}
+       "testsDir": str(out_dir), "files": written}
 (artifacts / f"{name}.usage.json").write_text(json.dumps(rec, indent=2))
 
 for path, lines in sorted(written.items()):
-    print(f"    {path}: {lines} lines")
+    print(f"    {out_dir / path}: {lines} lines")
 print(f"    prompt tokens: {rec['promptTokens']}, "
       f"completion tokens: {rec['completionTokens']}")
 PY

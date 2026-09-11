@@ -1,0 +1,11 @@
+{
+  "model": "gpt-4o-mini-2024-07-18",
+  "endpoint": "https://api.openai.com/v1",
+  "promptTokens": 1075,
+  "completionTokens": 937,
+  "files": {
+    "test_loyalty.py": 35,
+    "test_invoice.py": 26
+  },
+  "testsDir": "tests_llm_mini"
+}

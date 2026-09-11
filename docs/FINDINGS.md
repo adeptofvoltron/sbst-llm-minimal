@@ -324,3 +324,53 @@ One flake worth knowing about: a run can die with
 `ValueError: Unexpected node inside JoinedStr` from `ast._write_fstring_inner`
 while Pynguin unparses a test case the model returned. It hit us once in four
 runs and did not reproduce.
+
+## 10. The LLM column is a property of the model, not of "an LLM"
+
+Point 6 says an LLM given the specification found a defect nobody planted. That
+was `claude-opus-5`. Running the **same prompt, same specification, same code**
+through `gpt-4o-mini` - the model `make hybrid` uses - gives a suite that
+behaves like the SBST one:
+
+| | tests, both modules | coverage, both modules | FWPW on `loyalty`: before the patch -> after | unplanted defect |
+|---|---|---|---|---|
+| `claude-opus-5` | 94 | 100% | 16 failed -> **44 passed** | found |
+| `gpt-4o-mini` | 9 | 100% | 2 failed -> **3 failed** | not found |
+
+**Both suites reach 100% line and branch coverage on both modules.** The number
+that separates them is not coverage - it is what happens when the code is
+corrected, and there the smaller model moves the wrong way: applying
+`patches/fix_loyalty.patch` makes it fail *more*.
+
+Two of its assertions were read off the code rather than off the
+specification:
+
+```python
+assert loyalty.award_points(100, 5000) == 10   # spec: at least 5000 doubles -> 20
+assert loyalty.award_points(99.99, 0) == 9     # spec: banker's rounding -> 10
+```
+
+The first pins the `>` that `SPEC.md` section 1 calls "at least"; the second
+pins the truncation. Exactly the two planted divergences, cemented - which is
+what the prompt spends a paragraph telling the model not to do.
+
+Two more are wrong under *either* implementation, which is a different failure
+again:
+
+```python
+assert loyalty.award_points(2.5, 0) == 2       # 2.5 PLN -> 0.25 points -> 0
+assert loyalty.award_points(5000, 6000) == 5000  # 500 * 2 = 1000, below the cap
+```
+
+The first misreads the specification's rounding examples: `2.5 -> 2` describes
+the division result, not the order value. The suite is confidently wrong, in
+the shape of a test that names a section of the requirements in its comment.
+
+So the LLM row of the table in the README is not a statement about LLMs. It is
+a statement about one model. `run-llm.sh` takes `TESTS_DIR` so both suites can
+live side by side:
+
+```bash
+TESTS_DIR=tests_llm_mini bash run-llm.sh prompts/llm-from-spec.md
+make coverage MODULE=loyalty
+```
