@@ -3,6 +3,7 @@
 #   make setup     - srodowisko (raz)
 #   make sbst      - wygeneruj testy przeszukiwaniem (Pynguin)
 #   make ziarna    - to samo, ale z ziarnami semantycznymi od LLM-a
+#   make hybryda   - przeszukiwanie wolajace LLM, gdy staje (wymaga .env)
 #   make pokrycie  - zmierz, co FAKTYCZNIE pokrywaja wygenerowane pliki
 #   make raport    - pokaz, co RAPORTUJE Pynguin (to nie to samo)
 #   make fwpw      - walidacja Fails Without / Passes With
@@ -17,7 +18,14 @@ ZIARNO ?= 42
 MODUL  ?= invoice
 KATALOG ?= tests_sbst
 
-.PHONY: setup sbst ziarna pokrycie raport fwpw czysto
+# Tylko dla `make hybryda`.
+PLIK_ENV   ?= .env
+MODEL_LLM  ?= gpt-4o-mini
+PLATO      ?= 25
+UDZIAL_LLM ?= 0.5
+LIMIT_LLM  ?= 5
+
+.PHONY: setup sbst ziarna hybryda pokrycie raport fwpw czysto
 
 setup:
 	uv venv --python 3.12
@@ -38,6 +46,36 @@ ziarna:
 	  --report-dir raport/ziarna \
 	  --output_variables TargetModule,Coverage,BranchCoverage,FoundTestCases
 
+# Hybryda z artykulu, ale bez wlasnego pipeline'u: Pynguin 0.46 ma ten mechanizm
+# wbudowany (docs/USTALENIA.md punkt 5). Wymaga endpointu zgodnego z OpenAI.
+#
+# Konfiguracja idzie z $(PLIK_ENV) - wzor w .env.op. Klucz przekazujemy wylacznie
+# przez srodowisko, bo require_api_key() i tak go tam szuka, a flaga --api_key
+# byla by widoczna w `ps` i w historii powloki.
+hybryda:
+	@mkdir -p tests_hybryda
+	@rm -f tests_hybryda/test_$(MODUL).py
+	@if [ -f "$(PLIK_ENV)" ]; then set -a; . "./$(PLIK_ENV)"; set +a; fi; \
+	if [ -z "$$PYNGUIN_OPENAI_API_KEY$$OPENAI_API_KEY$$LLM_API_KEY" ]; then \
+	  echo "brak klucza do API."; \
+	  echo "  op run --env-file=.env.op -- make hybryda MODUL=$(MODUL)"; \
+	  echo "albo skopiuj .env.op do $(PLIK_ENV) i wstaw wartosci."; \
+	  exit 1; \
+	fi; \
+	model="$${LLM_MODEL:-$(MODEL_LLM)}"; \
+	echo "==> hybryda: $(MODUL), model $$model, budzet $(BUDZET)s, plateau $(PLATO)"; \
+	$(PYNGUIN) --project-path src --output-path tests_hybryda \
+	  --module-name $(MODUL) --maximum-search-time $(BUDZET) --seed $(ZIARNO) \
+	  --model-name "$$model" \
+	  --call-llm-on-stall-detection True \
+	  --call-llm-for-uncovered-targets True \
+	  --hybrid-initial-population True \
+	  --llm-test-case-percentage $(UDZIAL_LLM) \
+	  --max-plateau-len $(PLATO) \
+	  --max-llm-interventions $(LIMIT_LLM) \
+	  --report-dir raport/hybryda \
+	  --output_variables TargetModule,Coverage,BranchCoverage
+
 pokrycie:
 	@for katalog in tests_sbst tests_ziarna tests_llm tests_hybryda; do \
 	  if [ -f "$$katalog/test_$(MODUL).py" ]; then \
@@ -52,7 +90,7 @@ pokrycie:
 # tozsame z pokryciem wygenerowanego pliku - patrz docs/USTALENIA.md, punkt 1.
 raport:
 	@printf "\npokrycie RAPORTOWANE przez Pynguina (w trakcie przeszukiwania):\n"
-	@for w in sbst ziarna; do \
+	@for w in sbst ziarna hybryda; do \
 	  if [ -f raport/$$w/statistics.csv ]; then \
 	    printf "  %-8s %s\n" "$$w" "$$(tail -1 raport/$$w/statistics.csv)"; \
 	  fi; \

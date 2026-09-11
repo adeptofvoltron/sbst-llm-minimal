@@ -7,3 +7,6 @@ htmlcov/
 pynguin-report/
 raport/
 *.egg-info/
+.env
+.env.*
+!.env.op

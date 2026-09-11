@@ -10,4 +10,7 @@ dev = [
   "pynguin==0.46.0",
   "pytest==8.4.2",
   "pytest-cov==7.0.0",
+  # Bez tego Pynguin po cichu ignoruje .env - DOTENV_AVAILABLE w
+  # pynguin/utils/openai_key_resolver.py wypada na False.
+  "python-dotenv==1.1.1",
 ]

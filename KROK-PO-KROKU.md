@@ -296,6 +296,18 @@ PYNGUIN_DANGER_AWARE=1 .venv/bin/pynguin --help \
 staje - jest w Pynguinie **wbudowana jako flaga**. Nie trzeba jej budowac,
 trzeba ja wlaczyc i dac endpoint zgodny z OpenAI.
 
+Opakowane w `make hybryda`. Jedyny cel w tym repozytorium, ktory wymaga
+klucza i wychodzi do sieci - dlatego nie ma go w scenariuszu prezentacji:
+
+```bash
+cp .env.op .env          # wstaw klucz; .env jest w .gitignore
+make hybryda MODUL=invoice
+```
+
+Dwie pulapki po drodze (`docs/USTALENIA.md` punkt 8): bez `python-dotenv`
+Pynguin ignoruje `.env` bez slowa, a `LLM_MODEL` ze srodowiska przegrywa
+z niepusta wartoscia domyslna `gpt-4o-mini`.
+
 ---
 
 ## Porzadki

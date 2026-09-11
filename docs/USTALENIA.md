@@ -99,11 +99,17 @@ ten mechanizm jest **wbudowany**:
 --llm-url                         dowolny endpoint zgodny z OpenAI
 ```
 
-Nie uzywamy ich w tym repozytorium, bo wymagaja klucza do API zgodnego
-z OpenAI, a chcielismy, zeby wszystko dalo sie odtworzyc bez niego. Warto
-jednak wiedziec, ze czterostopniowy pipeline z wersji TypeScriptowej
-(intencja -> ziarna -> przeszukiwanie -> oracle) jest w Pythonie dostepny
-jako kilka flag.
+Czterostopniowy pipeline z wersji TypeScriptowej (intencja -> ziarna ->
+przeszukiwanie -> oracle) jest wiec w Pythonie dostepny jako kilka flag.
+Opakowal je `make hybryda`:
+
+```bash
+cp .env.op .env        # wstaw klucz, plik jest w .gitignore
+make hybryda MODUL=invoice
+```
+
+Reszta repozytorium dziala **bez klucza** - `make hybryda` jest jedynym celem,
+ktory go wymaga, i jako jedyny wychodzi do sieci.
 
 ## 6. LLM ze specyfikacja znalazl defekt, ktorego nikt nie zasial
 
@@ -171,3 +177,38 @@ Czyli: trzeba podac **katalog**, a plik w nim musi nazywac sie
 `test_<modul>.py`. Przy sciezce do pliku w logu pojawia sie tylko
 `Provided testcases are not used.` - bez wskazania przyczyny.
 Stad `seeds/test_invoice.py`, a nie `seeds/ziarna.py`.
+
+## 8. Konfiguracja LLM-a z `.env` ma dwie ciche pulapki
+
+Obie wyszly przy pisaniu `make hybryda` i obie psuja sie **bez komunikatu**.
+
+**Pierwsza: `python-dotenv` jest opcjonalny.** `pynguin/utils/openai_key_resolver.py`
+importuje go w `try/except ImportError` i ustawia `DOTENV_AVAILABLE`. Pynguin
+0.46 **nie ciagnie go za soba**, wiec w swiezym srodowisku `load_dotenv()` sie
+nie wykonuje i plik `.env` jest po prostu ignorowany. Zadnego ostrzezenia -
+dostajesz tylko `OpenAI API key not found`, mimo ze klucz lezy w `.env`.
+Stad `python-dotenv` w `pyproject.toml`.
+
+**Druga: zmienna `LLM_MODEL` przegrywa z wartoscia domyslna.**
+`get_model_name()` ma taka kolejnosc:
+
+```python
+cfg_model = getattr(config.configuration.large_language_model, "model_name", "")
+if cfg_model.strip():
+    return cfg_model          # <- zawsze tu wychodzi
+...
+for var in ("PYNGUIN_LLM_MODEL", "LLM_MODEL"):
+```
+
+A w `configuration.py:854` stoi `model_name: str = "gpt-4o-mini"`. Wartosc
+domyslna jest **niepusta**, wiec pierwszy warunek wychodzi zawsze i galaz ze
+srodowiskiem jest martwa. `LLM_MODEL=...` w `.env` nie zrobi nic - dopoki nie
+przekaze sie `--model-name` jawnie. Dlatego `make hybryda` czyta zmienna
+w powloce i podaje ja Pynguinowi flaga.
+
+Ta sama funkcja robi to dobrze dla URL-a (`llm_url: str = ""`) i dla klucza
+(`api_key: str = ""`) - tam wartosc domyslna jest pusta, wiec srodowisko
+dochodzi do glosu. Niespojnosc dotyczy wylacznie modelu.
+
+Przy okazji: klucz podajemy **tylko przez srodowisko**, nigdy przez
+`--api_key`. Flagi widac w `ps` i w historii powloki.

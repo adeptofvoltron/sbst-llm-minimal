@@ -245,6 +245,7 @@ bash run-llm.sh prompts/llm-ze-spec.md
 | `make setup` | srodowisko | ~20 s |
 | `make sbst MODUL=loyalty` | przeszukiwanie | 3 s |
 | `make ziarna MODUL=invoice` | przeszukiwanie z ziarnami | 3 s |
+| `make hybryda MODUL=invoice` | przeszukiwanie wolajace LLM, gdy staje - **wymaga klucza**, patrz `.env.op` | ~1 min |
 | `make pokrycie MODUL=invoice` | faktyczne pokrycie wygenerowanych plikow | 1 s |
 | `make raport MODUL=invoice` | raport Pynguina **obok** faktycznego pokrycia | 2 s |
 | `make fwpw` | walidacja Fails Without / Passes With | 1 s |
@@ -252,6 +253,12 @@ bash run-llm.sh prompts/llm-ze-spec.md
 
 Zmienne: `MODUL` (`loyalty` \| `invoice`), `BUDZET` (sekundy),
 `ZIARNO` (seed), `KATALOG` (`tests_sbst` \| `tests_llm` \| `tests_ziarna`).
+Dla `hybryda` dodatkowo: `PLATO` (ile iteracji bez postepu przed wolaniem
+LLM-a), `UDZIAL_LLM`, `LIMIT_LLM`, `PLIK_ENV`.
+
+Wszystko poza `make hybryda` dziala **bez klucza do API** i bez dostepu do
+sieci. `make hybryda` jako jedyne wymaga endpointu zgodnego z OpenAI -
+konfiguracja w `.env` (wzor: `.env.op`, `.env` jest w `.gitignore`).
 
 ---
 
