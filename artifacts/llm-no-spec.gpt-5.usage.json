@@ -1,0 +1,10 @@
+{
+  "model": "gpt-5-2025-08-07",
+  "endpoint": "https://api.openai.com/v1",
+  "promptTokens": 338,
+  "completionTokens": 5772,
+  "testsDir": "tests_llm_nospec_gpt5",
+  "files": {
+    "test_invoice.py": 86
+  }
+}

@@ -374,3 +374,61 @@ live side by side:
 TESTS_DIR=tests_llm_mini bash run-llm.sh prompts/llm-from-spec.md
 make coverage MODULE=loyalty
 ```
+
+## 11. Take the specification away and the stronger model fails louder
+
+Point 10 compared two models that both had `SPEC.md`. This one removes it.
+`prompts/llm-no-spec.md` is `prompts/llm-from-spec-invoice.md` minus the
+specification and minus the paragraph about deriving the oracle from it - so
+between the two columns the only variable is the requirements document.
+
+All six suites below are for `invoice` alone, measured with `pytest-cov` on the
+generated file, and checked against `patches/fix_invoice_unicode.patch` - the
+only real defect in that module:
+
+| model | spec | tests | coverage | before the patch | after | |
+|---|---|---|---|---|---|---|
+| `claude-opus-5` | yes | 50 | 100% | 1 failed, 49 passed | **50 passed** | detects |
+| `gpt-5` | yes | 20 | 100% | 20 passed | 20 passed | blind, clean |
+| `gpt-5` | no | 14 | 80% | 5 failed, 9 passed | 5 failed, 9 passed | false alarms |
+| `gpt-4o` | yes | 8 | 100% | 4 failed, 4 passed | 4 failed, 4 passed | wrong module |
+| `gpt-4o` | no | 5 | 100% | 5 passed | 5 passed | blind |
+| `gpt-4o-mini` | yes | 4 | 100% | 4 passed | 4 passed | blind |
+
+**Without the specification, `gpt-5` did not guess the requirements - it
+invented them,** and all three inventions contradict `SPEC.md` section 2:
+
+| `gpt-5` without the spec | `SPEC.md` section 2 |
+|---|---|
+| sequence is three digits, `001`-`999` | four digits, `NNNN` |
+| year capped at 2099 | 2000-2100 |
+| surrounding whitespace forbidden | "Surrounding whitespace is ignored" |
+
+It then reported those three as "defects found in the code" in prose, and wrote
+`# Business rule (SPEC.md §2)` into the file - **citing a document it was never
+given.** Five of its tests fail on correct code and go on failing after the
+patch: the suite carries no information about the real defect and blocks CI on
+the code that is right.
+
+Given the specification, the same model gets all three back:
+`FV/2100/12/9999` is asserted valid, `FV/2024/05/001` is on the malformed list,
+`"  \tFV/2026/09/0042\n"` parses - and the prose says "Divergences found: None
+found." The specification bought no detection and removed every false alarm.
+
+`gpt-4o` failed the other way. Handed the whole `SPEC.md` and asked only about
+`invoice`, it wrote four **loyalty** tests into `test_invoice.py`:
+
+```
+AttributeError: module 'invoice' has no attribute 'award_points'   x4
+```
+
+and listed the missing `award_points` as a divergence of `invoice.py` from the
+specification. `gpt-5` got byte-identical input and kept the scope, so this is
+a difference between models - but the original two-module prompt would never
+have exposed it, and that is worth saying out loud.
+
+Two things survive all six runs. **The Unicode defect from point 6 was found by
+`claude-opus-5` and by nothing else** - the other five suites behave the same
+before and after the patch. And **coverage predicts none of it, in the wrong
+direction**: 100% for the one suite that detects and for four that do not, and
+the single 80% belongs to the only run that fails loudly, falsely.

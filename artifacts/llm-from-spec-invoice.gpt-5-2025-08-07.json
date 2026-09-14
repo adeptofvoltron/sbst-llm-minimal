@@ -1,0 +1,46 @@
+{
+  "request": {
+    "model": "gpt-5",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Write unit tests that verify the code in `src/invoice.py` implements the\nagreed business rule.\n\nThe source of truth about the requirements is `SPEC.md`. The code is\n`src/invoice.py`. Both files are included below.\n\nThe most important rule: **derive the oracle from the specification, not from\nthe code.** If the code does something other than what `SPEC.md` says, the\ntest must assert the behaviour **required by the specification** - that is, it\nmust fail on the current code. Do not fit assertions to whatever the code\ncurrently returns.\n\nTechnical requirements:\n\n- pytest, file `tests_llm/test_invoice.py`\n- import the module directly (`import invoice`) - the tests are run with\n  `PYTHONPATH=src`\n- every assertion about a business rule must reference the `SPEC.md` section\n  it follows from, in a comment or in the test name\n\nAnswer with exactly one fenced code block, tagged with its path, and nothing\nelse before the block:\n\n````\n```python tests_llm/test_invoice.py\n<the whole file>\n```\n````\n\nAfter the block, list the divergences you found between the code and the\nspecification: file, rule from the specification, what the code does.\n\nHere are the files referred to above.\n\n### SPEC.md\n\n```\n# Business specification\n\n> This file plays the part of a Confluence page: it describes **intent**, not\n> the current behaviour of the code. Where the two differ, this document wins.\n\n## Section 1: Loyalty points\n\n`award_points(order_value_pln, lifetime_spend_pln) -> int`\n\n**Conversion rate.** A customer earns **1 point for every 10 PLN** of order\nvalue. The result of the division is rounded using **banker's rounding**: to\nthe nearest integer, and on an exact half to the even one.\n\n> Examples: `2.5 -> 2`, `3.5 -> 4`, `2.4 -> 2`, `2.6 -> 3`.\n\n**VIP multiplier.** A customer whose lifetime spend is **at least 5000 PLN**\nearns double the points.\n\n**Cap.** At most **5000 points** per order, applied after the VIP multiplier.\n\n**Validation.** Either amount being negative -> `ValueError(\"amounts must not\nbe negative\")`.\n\n## Section 2: Invoice identifier\n\n`parse_invoice_id(raw) -> dict`\n\n**Format.** `FV/YYYY/MM/NNNN`, where `YYYY` is the year (four digits), `MM` is\nthe month (`01`-`12`) and `NNNN` is the sequence number (four digits).\nExample of a valid value: `FV/2026/09/0042`.\nSurrounding whitespace is ignored.\n\n**Validation**\n\n| Condition | Reaction |\n|---|---|\n| does not match the format | `ValueError(\"malformed invoice id\")` |\n| year outside the range 2000-2100 | `ValueError(\"year out of supported range\")` |\n| sequence number equal to `0000` | `ValueError(\"sequence number must not be zero\")` |\n\n**Result.** `{\"year\": int, \"month\": int, \"seq\": int}` - without leading zeros.\n```\n\n### src/invoice.py\n\n```\n\"\"\"Invoice identifier. Business rule: SPEC.md, section 2.\"\"\"\n\nimport re\n\n_PATTERN = re.compile(r\"^FV/(\\d{4})/(0[1-9]|1[0-2])/(\\d{4})$\")\n\n\ndef parse_invoice_id(raw: str) -> dict:\n    match = _PATTERN.match(raw.strip())\n    if match is None:\n        raise ValueError(\"malformed invoice id\")\n\n    year = int(match.group(1))\n    month = int(match.group(2))\n    seq = int(match.group(3))\n\n    if year < 2000 or year > 2100:\n        raise ValueError(\"year out of supported range\")\n    if seq == 0:\n        raise ValueError(\"sequence number must not be zero\")\n\n    return {\"year\": year, \"month\": month, \"seq\": seq}\n```"
+      }
+    ]
+  },
+  "response": {
+    "id": "chatcmpl-EO74F1RYSnLsDfX4clHdQHpT9HE5j",
+    "object": "chat.completion",
+    "created": 1789415747,
+    "model": "gpt-5-2025-08-07",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "```python tests_llm/test_invoice.py\nimport pytest\nimport invoice\n\n\n# SPEC.md Section 2: Invoice identifier - Result shape and whitespace handling\ndef test_parse_invoice_id_happy_path_ignores_surrounding_whitespace_and_returns_ints_spec_section_2():\n    result = invoice.parse_invoice_id(\"  \\tFV/2026/09/0042\\n\")\n    assert result == {\"year\": 2026, \"month\": 9, \"seq\": 42}  # SPEC.md §2: returns ints without leading zeros\n\n\n# SPEC.md Section 2: Invoice identifier - Year boundaries 2000-2100 inclusive\n@pytest.mark.parametrize(\n    \"raw, expected\",\n    [\n        (\"FV/2000/01/0001\", {\"year\": 2000, \"month\": 1, \"seq\": 1}),\n        (\"FV/2100/12/9999\", {\"year\": 2100, \"month\": 12, \"seq\": 9999}),\n    ],\n)\ndef test_parse_invoice_id_accepts_boundary_years_2000_and_2100_spec_section_2(raw, expected):\n    assert invoice.parse_invoice_id(raw) == expected  # SPEC.md §2: year 2000-2100 allowed\n\n\n# SPEC.md Section 2: Invoice identifier - Year outside 2000-2100 -> \"year out of supported range\"\n@pytest.mark.parametrize(\"raw\", [\"FV/1999/12/0001\", \"FV/2101/01/0001\"])\ndef test_parse_invoice_id_rejects_year_out_of_range_with_specific_message_spec_section_2(raw):\n    with pytest.raises(ValueError) as excinfo:\n        invoice.parse_invoice_id(raw)\n    assert str(excinfo.value) == \"year out of supported range\"  # SPEC.md §2: precise error message\n\n\n# SPEC.md Section 2: Invoice identifier - Sequence number \"0000\" forbidden\ndef test_parse_invoice_id_rejects_zero_sequence_with_specific_message_spec_section_2():\n    with pytest.raises(ValueError) as excinfo:\n        invoice.parse_invoice_id(\"FV/2024/05/0000\")\n    assert str(excinfo.value) == \"sequence number must not be zero\"  # SPEC.md §2: precise error message\n\n\n# SPEC.md Section 2: Invoice identifier - Format validation -> \"malformed invoice id\"\n@pytest.mark.parametrize(\n    \"raw\",\n    [\n        \"FV/2024/5/0001\",     # month not two digits\n        \"FV/2024/00/0001\",    # month out of range (00)\n        \"FV/2024/13/0001\",    # month out of range (13)\n        \"fv/2024/05/0001\",    # lowercase prefix\n        \"INV/2024/05/0001\",   # wrong prefix\n        \"FV/2024/05/001\",     # seq not four digits\n        \"FV/2024/05/10000\",   # seq five digits\n        \"FV/24/05/0001\",      # year not four digits\n        \"FV//05/0001\",        # missing year\n        \"\",                   # empty\n        \"   \",                # only whitespace\n    ],\n)\ndef test_parse_invoice_id_rejects_malformed_inputs_with_specific_message_spec_section_2(raw):\n    with pytest.raises(ValueError) as excinfo:\n        invoice.parse_invoice_id(raw)\n    assert str(excinfo.value) == \"malformed invoice id\"  # SPEC.md §2: precise error message\n\n\n# SPEC.md Section 2: Invoice identifier - Month range and integer conversion in result\n@pytest.mark.parametrize(\n    \"raw, expected_month\",\n    [\n        (\"FV/2024/01/0001\", 1),\n        (\"FV/2024/09/0001\", 9),\n        (\"FV/2024/12/0001\", 12),\n    ],\n)\ndef test_parse_invoice_id_month_parsed_as_int_without_leading_zeros_spec_section_2(raw, expected_month):\n    result = invoice.parse_invoice_id(raw)\n    assert isinstance(result[\"month\"], int)  # SPEC.md §2: int fields\n    assert result[\"month\"] == expected_month  # SPEC.md §2: no leading zeros in returned ints\n```\n\n\nDivergences found between code and specification:\n- None found. The implementation in src/invoice.py for parse_invoice_id matches SPEC.md Section 2 as covered by the tests.",
+          "refusal": null,
+          "annotations": []
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 884,
+      "completion_tokens": 3251,
+      "total_tokens": 4135,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "audio_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 2304,
+        "audio_tokens": 0,
+        "accepted_prediction_tokens": 0,
+        "rejected_prediction_tokens": 0
+      }
+    },
+    "service_tier": "default",
+    "system_fingerprint": null
+  }
+}

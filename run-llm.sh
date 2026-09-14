@@ -19,7 +19,12 @@ ENV_FILE="${ENV_FILE:-.env}"
 # without one overwriting the other's suite.
 export TESTS_DIR="${TESTS_DIR:-tests_llm}"
 
+# Sourcing .env would overwrite an LLM_MODEL set in the environment, so the
+# one passed on the command line is put back afterwards. That is how a second
+# model gets run against the same .env without editing it.
+MODEL_OVERRIDE="${LLM_MODEL:-}"
 if [ -f "$ENV_FILE" ]; then set -a; . "./$ENV_FILE"; set +a; fi
+if [ -n "$MODEL_OVERRIDE" ]; then export LLM_MODEL="$MODEL_OVERRIDE"; fi
 
 if [ -z "${PYNGUIN_OPENAI_API_KEY:-}${OPENAI_API_KEY:-}${LLM_API_KEY:-}" ]; then
   echo "no API key."
@@ -42,12 +47,30 @@ base = (os.environ.get("LLM_BASE_URL") or "https://api.openai.com/v1").rstrip("/
 
 text = prompt_path.read_text()
 # Body of the prompt: everything after the front matter.
-body = text.split("---\n", 2)[2] if text.startswith("---\n") else text
+has_front = text.startswith("---\n")
+body = text.split("---\n", 2)[2] if has_front else text
+front = {}
+if has_front:
+    for line in text.split("---\n", 2)[1].splitlines():
+        k, _, v = line.partition(":")
+        if _:
+            front[k.strip()] = v.strip().strip('"')
+
+
+def declared(field):
+    """Paths listed in a front matter field, minus any parenthetical note."""
+    value = re.sub(r"\(.*?\)", "", front.get(field, ""))
+    return [p for p in (x.strip() for x in value.split(",")) if p.endswith(".py")
+            or p.endswith(".md")]
+
 
 # A chat completion has no tools, so the inputs the prompt refers to travel
 # with the request. That also enforces the "do not look at the answer"
 # constraint by construction: the model sees these files and nothing else.
-INPUTS = ["SPEC.md", "src/loyalty.py", "src/invoice.py"]
+# The front matter is the only place that says which ones - so a prompt that
+# withholds SPEC.md withholds it from the request too, with nothing to keep in
+# sync here.
+INPUTS = declared("inputs") or ["SPEC.md", "src/loyalty.py", "src/invoice.py"]
 parts = [body.strip(), "", "Here are the files referred to above."]
 for f in INPUTS:
     parts += ["", f"### {f}", "", "```", pathlib.Path(f).read_text().rstrip(), "```"]
@@ -72,6 +95,9 @@ except urllib.error.URLError as e:
 
 artifacts = pathlib.Path("artifacts")
 artifacts.mkdir(exist_ok=True)
+# The model goes in the file name, so running a second model against the same
+# prompt does not overwrite the first one's transcript.
+name = f"{name}.{resp.get('model', model)}"
 # The request goes into the record too, so the transcript shows exactly what
 # the model was given. It holds no key - that travels in the header.
 (artifacts / f"{name}.json").write_text(
@@ -98,7 +124,8 @@ for path, code in FENCE.findall(answer):
     p.write_text(code)
     written[src.name] = len(code.splitlines())
 
-expected = {"test_loyalty.py", "test_invoice.py"}
+expected = {pathlib.Path(p).name for p in declared("output")} or {
+    "test_loyalty.py", "test_invoice.py"}
 missing = expected - written.keys()
 if missing:
     sys.exit(f"    the reply did not contain {', '.join(sorted(missing))}; "
