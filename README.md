@@ -30,13 +30,25 @@ measured with `pytest-cov`, not as reported by the tool:
 |---|---|---|---|
 | SBST (Pynguin, 20 s) | 1 | **35%** | cemented in |
 | SBST + semantic seeds | 4 | **35%** | cemented in |
-| SBST + LLM on stall (hybrid) | 5-6 | **70-90%** | not detected |
+| hybrid, `gpt-4o-mini` | 5 | **70%** | not detected |
+| hybrid, `gpt-4o` | 6 | **100%** | not detected |
+| hybrid, `gpt-5` | 5 | **100%** | not detected |
+| hybrid + spec in the docstring, `gpt-4o` | 4 | 89% | **false positive** |
 | LLM with the spec, `gpt-4o-mini` | 4 | **100%** | not detected |
 | LLM with the spec, `claude-opus-5` | 50 | **100%** | **detected** |
 
-The hybrid row needs a key and varies between runs - two runs gave 6 tests at
-90% and 5 tests at 70%; the committed suite is the second. The SBST and LLM
-rows are committed and run offline.
+The hybrid rows need a key and vary between runs. `gpt-4o` is a real gain on
+coverage - 70% to 100%, and the first hybrid suite for `loyalty` at all - and
+no gain at all in the last column, which is point 11.
+
+The sixth row is worth the detour. Paste `SPEC.md` into the module docstring
+and add `--assertion_generation LLM` and the model does write assertions from
+the requirements: on `loyalty`, one of three seeds produced a single assertion
+pinning **both** planted divergences. Pynguin then deleted 70-90% of what the
+model returned, because the pass that runs afterwards drops every assertion
+that fails - which is every assertion that detected anything. On `invoice`
+what survived was a mangled `assert dict_0 is None` that fails on correct and
+incorrect code alike. Point 12.
 
 Note the bottom two rows: **same prompt, same specification, same code, 100%
 coverage both times, and only one of them detects anything.** Coverage and
@@ -44,7 +56,7 @@ oracle are separate axes; the last column is the one that matters and no
 percentage predicts it. Details in [`docs/FINDINGS.md`](docs/FINDINGS.md),
 point 10.
 
-Three things that follow from this, none of which we planned:
+Four things that follow from this, none of which we planned:
 
 1. **Seeds raised the coverage Pynguin reports from 22.2% to 88.9%, and the
    coverage of the generated file by not a single point.** Measure the
@@ -52,7 +64,11 @@ Three things that follow from this, none of which we planned:
 2. **The LLM with the specification found a defect nobody planted**: `\d` in
    Python matches Unicode digits, so `FV/٢٠٢٦/09/0042` passed validation and
    `int()` politely returned `2026`.
-3. **The hybrid from the article is a flag in Pynguin**, not a pipeline -
+3. **Pynguin deletes the assertions that find defects.** Not a metaphor:
+   `__remove_non_holding_assertions` executes the suite and drops everything
+   that does not pass, so an assertion derived from the specification and
+   contradicting the code is removed by construction. Point 12.
+4. **The hybrid from the article is a flag in Pynguin**, not a pipeline -
    `--call-llm-on-stall-detection`, `--max-plateau-len`, `--llm-url`. Set those
    flags alone and you get a run that succeeds, records them in its config and
    ignores every one of them: they only take effect under

@@ -374,3 +374,150 @@ live side by side:
 TESTS_DIR=tests_llm_mini bash run-llm.sh prompts/llm-from-spec.md
 make coverage MODULE=loyalty
 ```
+
+## 11. A better model moves coverage and nothing else
+
+Point 10 compared two models writing a suite **from the specification**. This
+is the other comparison: the same `make hybrid`, the same flags, the same
+budget and seed, with the model swapped. The key in `.env` sees 16 models, of
+which `gpt-5`, `gpt-4o`, `gpt-4-turbo`, `gpt-4` and `gpt-3.5-turbo` can write
+code.
+
+`BUDGET=20 SEED=42`, coverage measured with `pytest-cov` on the exported file:
+
+| model | `invoice` | `loyalty` | FWPW on `loyalty` |
+|---|---|---|---|
+| `gpt-4o-mini` | 5 tests, 70% | 5 tests, 100% | 5 passed -> 5 passed |
+| `gpt-4o` | 6 tests, **100%** | 5 tests, **100%** | 5 passed -> 5 passed |
+| `gpt-5` | 5 tests, **100%** | 1 test, 65% | 1 passed -> **1 failed** |
+
+`gpt-4o` is a real improvement on the axis the hybrid actually has: 70% -> 100%
+on `invoice`, and the first hybrid suite for `loyalty` at all. The detection
+column does not move, and it cannot - point 9 explains why, and point 12 shows
+what happens when you try to make it move.
+
+`gpt-5` is **worse than `gpt-4o` here**, twice over. It parses badly -
+`LLMTotalParsedStatements` is 11 of 35 on `loyalty`, against 47 of 71 for
+`gpt-4o` - and it spends ~3500 output tokens against 825 to get there.
+
+Two of the suites went the wrong way. `tests_hybrid_gpt5/test_loyalty.py` pins
+`award_points(127.19, 127.19) == 12`, which is the truncation; apply
+`patches/fix_loyalty.patch` and it fails. `gpt-4o` dodged both planted
+divergences by accident - it picked `lifetime` of 5100 and 6000, never exactly
+5000, and no fractional order value, so it never touched either.
+
+Two things `gpt-5` surfaced on the way, both of them silent failures:
+
+**Pynguin sends `temperature=0.8` and `gpt-5` accepts only 1.0.** The API
+answers `unsupported_value`, `llmagent.py:299` swallows it, and the run exits
+0 with `TotalLLMCalls 5 / 0 tokens` and 22.2% coverage - plain SBST again, the
+same end state as point 9 by a different road. There is a `--temperature`
+flag; `make hybrid` now takes `TEMP`.
+
+**The `Unexpected node inside JoinedStr` flake from point 9 is f-strings.**
+`gpt-5` likes returning them and Pynguin's unparser cannot handle one. At the
+same seed 42 the first attempt died and the second went through, so the seed
+does not pin it.
+
+## 12. Feeding the hybrid the specification: it works, and the tool deletes the evidence
+
+Point 11 says the hybrid cannot detect a divergence. That was too strong. It
+can, once, by accident, and watching how the accident happens is the most
+useful thing in this repository.
+
+Two channels exist in Pynguin already:
+
+**The specification reaches the prompt through the docstring.** Both
+`AssertionGenerationPrompt` and the test-generation prompt interpolate the
+**whole module source**. `src_spec/` holds the same two modules with the text
+of `SPEC.md` pasted into the docstring instead of the pointer
+`Business rule: SPEC.md, section 2` that was already there. The pointer had
+been travelling in the prompt all along; the target had not.
+
+**`--assertion_generation LLM` exists.** `configuration.py:80` defines
+`AssertionGenerator.LLM` and `llmassertiongenerator.py` implements it. The
+default is `MUTATION_ANALYSIS`.
+
+`gpt-4o`, `SRC=src_spec`, `ASSERT=LLM`, three seeds on `loyalty`:
+
+| seed | coverage | before the patch | after | |
+|---|---|---|---|---|
+| 42 | 78% | 1 failed | 1 failed | catches VIP, cements the rounding |
+| **7** | **100%** | **1 failed** | **2 passed** | **clean detection** |
+| 1337 | 89% | 1 failed | 1 failed | catches nothing |
+
+Seed 7, `tests_hybrid_spec/s7/test_loyalty.py`:
+
+```python
+def test_case_3():
+    int_0 = 5000
+    int_1 = 35
+    int_2 = module_0.award_points(int_1, int_0)
+    int_3 = 8
+    var_0 = int_2 == int_3
+    assert var_0 is True
+```
+
+`award_points(35, 5000)`. Specification: 35/10 = 3.5, banker's rounding -> 4,
+and a lifetime spend of 5000 is "at least 5000" -> VIP -> **8**. The code:
+`35 // 10 = 3`, `5000 > 5000` is False -> **3**. One assertion pins **both**
+planted divergences, and it passes once the patch is applied. It cost about
+half a cent.
+
+That is the first defect the hybrid has detected anywhere in this repository.
+Now the reason not to trust it.
+
+**The filter is designed to delete exactly these.** `generator.py:1078`: after
+`LLMAssertionGenerator` runs, `MutationAnalysisAssertionGenerator` runs too,
+and its `_add_assertions` calls `__remove_non_holding_assertions`
+(`assertiongenerator.py:133`), which executes the suite and drops every
+assertion that does not pass. Which is to say, every assertion that detected
+something. The attrition is visible in the statistics:
+
+| run | assertions from the model | kept | in the file |
+|---|---|---|---|
+| `loyalty` s42 | 35 | 6 | 4 |
+| `loyalty` s7 | 46 | 13 | 6 |
+| `loyalty` s1337 | 25 | 2 | 2 |
+| `invoice` s42 | 16 | 1 | 1 |
+
+Those are the `TotalAssertionsReceivedFromLLM` and
+`TotalAssertionsAddedFromLLM` variables, which `make hybrid` now requests -
+without them the effect is invisible. Seventy to ninety percent attrition is
+not noise, it is a selection for "the suite must be green". What survived,
+survived because of the shape the deserializer gave it
+(`var_0 = a == b; assert var_0 is True`), not because anything intended it to.
+
+**And `invoice` produced a false positive.** The single surviving assertion is:
+
+```python
+def test_case_0():
+    str_0 = "FV/2000/01/0001"
+    dict_0 = module_0.parse_invoice_id(str_0)
+    assert dict_0 is None          # the function returns a dict
+```
+
+It fails before the patch and after it. The model almost certainly wrote a
+comparison against a dict literal and the deserializer, unable to represent
+one, degraded it to `is None`. The Unicode defect from point 6 is still not
+found.
+
+That is the real risk, and it is worse than "it does not work": a single file
+now mixes assertions derived from the specification with regression assertions
+read off the code, with nothing marking which is which. Seed 42 has one of
+each - `test_case_2` detects the VIP threshold, `test_case_1` cements the
+truncation. A red test now means "a defect", or "the model was wrong", or "the
+deserializer mangled it". The triage that the hybrid's zero-false-positive
+property used to buy you is back.
+
+Pynguin also wraps exception-raising tests in `@pytest.mark.xfail(strict=True)`,
+so a requirement like `ValueError("malformed invoice id")` becomes "this must
+raise something", with the message unchecked.
+
+The conclusion is not that the model is too weak or the prompt wrong. **The
+model was given the specification and wrote the correct assertion for
+`award_points(35, 5000)`. The tool threw it away**, because a search-based
+generator assumes the code is correct and the test must conform to it. In SBST
+that assumption is the foundation, not a bug - and that is what makes an
+oracle derived from requirements a different tool, rather than a better
+setting for this one.
