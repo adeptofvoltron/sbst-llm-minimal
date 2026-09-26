@@ -374,3 +374,55 @@ live side by side:
 TESTS_DIR=tests_llm_mini bash run-llm.sh prompts/llm-from-spec.md
 make coverage MODULE=loyalty
 ```
+
+## 11. The hybrid sees the specification only through the docstring
+
+Pynguin's LLM prompt carries the module source verbatim - `inspect.getsource`
+in `large_language_model/llmagent.py` - and nothing else from the project. So
+the only way to hand the hybrid `SPEC.md` is to put it in the code. We ran
+`parse_invoice_id` from a copy of `src/invoice.py` whose module docstring holds
+section 2 word for word; the code under it is unchanged, and the suite is
+measured against the real `src/invoice.py`. The copy lived outside the
+repository, so the run is described here rather than reproducible from a target.
+
+`gpt-5`, `--algorithm LLMOSA`, the `make hybrid` flags, seed 42, 20 s:
+
+| | tests | coverage on `src/invoice.py` (pytest-cov) |
+|---|---|---|
+| `tests_hybrid` (no spec in the docstring) | 5 | 70% |
+| `tests_hybrid_docspec` (section 2 in the docstring) | 4 | **100%** line and branch |
+
+Pynguin reported 14 of 22 LLM statements parsed. The docstring did its job on
+the model: its raw answer (`report/<dir>/llm_query_results.txt`) tested both
+year bounds, `0000`, surrounding whitespace and eleven malformed variants, and
+checked every error message against the table. What survived into the suite is
+much thinner - `pytest.raises(ValueError)` with no message match, and the
+whitespace case asserts nothing about the result. The inputs made it into the
+final suite and the expectations did not, which is point 9 again: the hybrid
+moves coverage, not the oracle.
+
+Getting that one run took four; the first three were each lost a different way:
+
+**`gpt-5` rejects Pynguin's temperature.** The default is `0.8`
+(`configuration.py`, `LLMConfiguration.temperature`); `gpt-5` accepts only `1`
+and answers every call with `400 unsupported_value`. The run still exits 0 and
+writes a plain SBST suite. `--temperature 1` fixes it - the flag is generated
+from the config field, like `--model-name`, though `--help` printed no option
+list to find it in.
+
+**An answer that opens with prose is dropped whole.**
+`extract_python_code_from_llm_output` looks for ```` ```python ```` blocks; when
+there are none it passes the entire answer on. Neither of the two `gpt-5`
+answers we kept was fenced. One was pure code and parsed; the other opened with
+"Below is a pytest test suite..." and `rewrite_tests` returned `{}` - no exception, no warning, every
+test discarded. The tell is `LLMTotalParsedStatements` - empty or
+0 - next to a non-zero `TotalLLMOutputTokens`, because
+`TotalCodelessLLMResponses` reads **0** on exactly this run: the statistic is
+recorded in the `finally` of the API call (`llmagent.py`, `query`), and the
+counter behind it is incremented only afterwards, when the handler extracts the
+code. A codeless answer shows up only if another call follows it. Fed the
+same answer with the prose cut off, `rewrite_tests` parses all seven tests.
+
+**The `JoinedStr` crash from point 9 is not a one-off.** With the specification
+in the prompt the model builds invoice ids with f-strings, and one of the three
+runs at temperature 1 died on it with exit 2.
